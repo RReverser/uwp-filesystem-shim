@@ -1,0 +1,30 @@
+{
+  "name": "uwp-filesystem",
+  "version": "1.0.0",
+  "description": "FileSystem API polyfill for Universal Windows Platform",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rreverser/uwp-filesystem.git"
+  },
+  "keywords": [
+    "filesystem",
+    "polyfill",
+    "html5",
+    "uwp",
+    "winrt",
+    "winjs",
+    "windows",
+    "filewriter",
+    "filesaver"
+  ],
+  "author": "Ingvar Stepanyan <me@rreverser.com> (https://rreverser.com/)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rreverser/uwp-filesystem/issues"
+  },
+  "homepage": "https://github.com/rreverser/uwp-filesystem#readme"
+}
