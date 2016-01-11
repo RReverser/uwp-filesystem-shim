@@ -4,7 +4,8 @@
   "description": "FileSystem API polyfill for Universal Windows Platform",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "tsd install",
+    "dev": "tsc -p . --watch"
   },
   "repository": {
     "type": "git",
@@ -26,5 +27,9 @@
   "bugs": {
     "url": "https://github.com/rreverser/uwp-filesystem/issues"
   },
-  "homepage": "https://github.com/rreverser/uwp-filesystem#readme"
+  "homepage": "https://github.com/rreverser/uwp-filesystem#readme",
+  "devDependencies": {
+    "tsd": "^0.6.5",
+    "typescript": "^1.7.5"
+  }
 }

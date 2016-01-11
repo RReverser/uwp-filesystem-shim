@@ -2,12 +2,11 @@
     "compilerOptions": {
         "target": "es5",
         "noImplicitAny": true,
+        "newLine": "CRLF",
         "outFile": "index.js"
     },
     "files": [
-        "typings/filesystem/filesystem.d.ts",
-        "typings/winjs/winjs.d.ts",
-        "typings/winrt/winrt.d.ts",
+        "typings/tsd.d.ts",
 
         "src/ProgressEvent.ts",
 

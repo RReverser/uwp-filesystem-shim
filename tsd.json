@@ -6,16 +6,16 @@
   "bundle": "typings/tsd.d.ts",
   "installed": {
     "winrt/winrt.d.ts": {
-      "commit": "6eebd5e90a1cbd6b47b0705ba72dbcd5baf846f3"
+      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
     },
     "winjs/winjs.d.ts": {
-      "commit": "6eebd5e90a1cbd6b47b0705ba72dbcd5baf846f3"
+      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
     },
     "filewriter/filewriter.d.ts": {
-      "commit": "6eebd5e90a1cbd6b47b0705ba72dbcd5baf846f3"
+      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
     },
     "filesystem/filesystem.d.ts": {
-      "commit": "6eebd5e90a1cbd6b47b0705ba72dbcd5baf846f3"
+      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
     }
   }
 }
