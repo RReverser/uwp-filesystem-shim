@@ -4,9 +4,7 @@ const enum ReadyState {
     DONE
 };
 
-type ProgressEventHandler = (event: ProgressEvent) => void;
-
-class StorageFileWriter implements FileWriter {
+class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     INIT = ReadyState.INIT;
     WRITING = ReadyState.WRITING;
     DONE = ReadyState.DONE;
@@ -15,32 +13,12 @@ class StorageFileWriter implements FileWriter {
     private _error: DOMError = null;
     private _writingProcess: Windows.Foundation.IPromise<any> = null;
     
-    private _listeners: { [type: string]: ProgressEventHandler[] } = Object.create(null);
-
-    addEventListener(type: string, listener: ProgressEventHandler) {
-        this._listeners[type].push(listener);
-    }
-    
-    dispatchEvent(event: ProgressEvent) {
-        this._listeners[event.type].forEach(function (listener) {
-            listener.call(this, event);
-        }, this);
-        return event.defaultPrevented;
-    }
-    
-    removeEventListener(type: string, listener: ProgressEventHandler) {
-        let listeners = this._listeners[type];
-        let index = listeners.indexOf(listener);
-        if (index < 0) return;
-        listeners.splice(index, 1);
-    }
-
-    onwritestart: ProgressEventHandler;
-    onprogress: ProgressEventHandler;
-    onwrite: ProgressEventHandler;
-    onabort: ProgressEventHandler;
-    onerror: ProgressEventHandler;
-    onwriteend: ProgressEventHandler;
+    @progressEvent onwritestart: ProgressEventHandler;
+    @progressEvent onprogress: ProgressEventHandler;
+    @progressEvent onwrite: ProgressEventHandler;
+    @progressEvent onabort: ProgressEventHandler;
+    @progressEvent onerror: ProgressEventHandler;
+    @progressEvent onwriteend: ProgressEventHandler;
 
     get readyState() {
         return this._readyState;
@@ -59,20 +37,7 @@ class StorageFileWriter implements FileWriter {
     }
 
     constructor(private _stream: Windows.Storage.Streams.IRandomAccessStream) {
-        ['writestart', 'progress', 'write', 'abort', 'error', 'writeend'].forEach(type => {
-            let name = `on${type}`;
-            let progressEvents = <{ [name: string]: ProgressEventHandler }><any>this;
-            progressEvents[name] = null;
-            this._listeners[type] = [event => {
-                let handler = progressEvents[name];
-                if (typeof handler === 'function') {
-                    let result = handler.call(this, event);
-                    if (result === false) {
-                        event.preventDefault();
-                    }
-                }
-            }];
-        });
+        super();
     }
 
     abort() {

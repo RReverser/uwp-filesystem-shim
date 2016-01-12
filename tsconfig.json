@@ -1,7 +1,9 @@
 {
     "compilerOptions": {
-        "target": "es5",
+        "target": "es6",
         "noImplicitAny": true,
+        "experimentalDecorators": true,
+        "suppressImplicitAnyIndexErrors": true,
         "newLine": "CRLF",
         "outFile": "index.js"
     },
@@ -9,7 +11,6 @@
         "typings/tsd.d.ts",
 
         "src/ProgressEvent.ts",
-
         "src/errors.ts",
 
         "src/StorageEntry.ts",
