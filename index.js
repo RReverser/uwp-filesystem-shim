@@ -349,18 +349,23 @@ var StorageFileWriter = (function () {
 var TEMPORARY = 0;
 var PERSISTENT = 1;
 var appData = Windows.Storage.ApplicationData.current;
-var fileSystems = [
-    new StorageFileSystem('temp', appData.temporaryFolder),
-    new StorageFileSystem('local', appData.localFolder)
-];
+var fileSystemResolvers = [
+    function () { return new StorageFileSystem('temp', appData.temporaryFolder); },
+    function () { return new StorageFileSystem('local', appData.localFolder); }
+].map(function (createFS, i, resolvers) { return function () {
+    var fs = createFS();
+    resolvers[i] = function () { return fs; };
+    return fs;
+}; });
 var requestFileSystem = function requestFileSystem(type, size, onSuccess, onError) {
-    onSuccess(fileSystems[type]);
+    onSuccess(fileSystemResolvers[type]());
 };
 var resolveLocalFileSystemURL = function resolveLocalFileSystemURL(url, onSuccess, onError) {
     var match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
     if (!match) {
         onError(new SecurityError());
     }
+    var type = match[1] === 'local' ? PERSISTENT : TEMPORARY;
     Windows.Storage.StorageFile.getFileFromApplicationUriAsync(new Windows.Foundation.Uri(url))
-        .done(function (file) { return new StorageFileEntry(fileSystems[match[1] === 'local' ? 1 : 0], file); }, onError);
+        .done(function (file) { return new StorageFileEntry(fileSystemResolvers[type](), file); }, onError);
 };

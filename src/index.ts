@@ -3,13 +3,17 @@ const PERSISTENT = 1;
 
 const appData = Windows.Storage.ApplicationData.current;
 
-const fileSystems = [
-    new StorageFileSystem('temp', appData.temporaryFolder),
-    new StorageFileSystem('local', appData.localFolder)
-];
+const fileSystemResolvers = [
+    () => new StorageFileSystem('temp', appData.temporaryFolder),
+    () => new StorageFileSystem('local', appData.localFolder)
+].map((createFS, i, resolvers) => () => {
+    let fs = createFS();
+    resolvers[i] = () => fs;
+    return fs;
+});
 
 var requestFileSystem: typeof window.requestFileSystem = function requestFileSystem(type, size, onSuccess, onError?) {
-    onSuccess(fileSystems[type]);
+    onSuccess(fileSystemResolvers[type]());
 };
 
 var resolveLocalFileSystemURL: typeof window.resolveLocalFileSystemURL = function resolveLocalFileSystemURL(url, onSuccess, onError?) {
@@ -17,6 +21,7 @@ var resolveLocalFileSystemURL: typeof window.resolveLocalFileSystemURL = functio
     if (!match) {
         onError(new SecurityError());
     }
+    let type = match[1] === 'local' ? PERSISTENT : TEMPORARY;
     Windows.Storage.StorageFile.getFileFromApplicationUriAsync(new Windows.Foundation.Uri(url))
-    .done(file => new StorageFileEntry(fileSystems[match[1] === 'local' ? 1 : 0], file), onError);
+    .done(file => new StorageFileEntry(fileSystemResolvers[type](), file), onError);
 };
