@@ -207,8 +207,9 @@ var StorageFileWriter = (function () {
         this.INIT = 0 /* INIT */;
         this.WRITING = 1 /* WRITING */;
         this.DONE = 2 /* DONE */;
-        this.readyState = 0 /* INIT */;
-        this.error = null;
+        this._readyState = 0 /* INIT */;
+        this._error = null;
+        this._writingProcess = null;
         this._listeners = Object.create(null);
         ['writestart', 'progress', 'write', 'abort', 'error', 'writeend'].forEach(function (type) {
             var name = "on" + type;
@@ -241,6 +242,20 @@ var StorageFileWriter = (function () {
             return;
         listeners.splice(index, 1);
     };
+    Object.defineProperty(StorageFileWriter.prototype, "readyState", {
+        get: function () {
+            return this._readyState;
+        },
+        enumerable: true,
+        configurable: true
+    });
+    Object.defineProperty(StorageFileWriter.prototype, "error", {
+        get: function () {
+            return this._error;
+        },
+        enumerable: true,
+        configurable: true
+    });
     Object.defineProperty(StorageFileWriter.prototype, "position", {
         get: function () {
             return this._stream.position;
@@ -256,17 +271,15 @@ var StorageFileWriter = (function () {
         configurable: true
     });
     StorageFileWriter.prototype.abort = function () {
-        if (this.readyState === 2 /* DONE */ || this.readyState === 0 /* INIT */) {
+        if (this._readyState === 2 /* DONE */ || this._readyState === 0 /* INIT */) {
             return;
         }
-        this.readyState = 2 /* DONE */;
-        throw new NotImplementedError();
-        this.error = new AbortError();
-        this.dispatchEvent(new ProgressEvent('abort'));
-        this.dispatchEvent(new ProgressEvent('writeend'));
+        this._writingProcess.cancel();
+        this._error = new AbortError();
+        this._writeEnd('abort');
     };
     StorageFileWriter.prototype.seek = function (offset) {
-        if (this.readyState === 1 /* WRITING */) {
+        if (this._readyState === 1 /* WRITING */) {
             throw new InvalidStateError();
         }
         var length = this.length;
@@ -282,14 +295,16 @@ var StorageFileWriter = (function () {
         this._stream.seek(offset);
     };
     StorageFileWriter.prototype._writeStart = function () {
-        if (this.readyState === 1 /* WRITING */) {
+        if (this._readyState === 1 /* WRITING */) {
             throw new InvalidStateError();
         }
-        this.readyState = 1 /* WRITING */;
+        this._readyState = 1 /* WRITING */;
+        this._error = null;
         this.dispatchEvent(new ProgressEvent('writestart'));
     };
     StorageFileWriter.prototype._writeEnd = function (status) {
-        this.readyState = 2 /* DONE */;
+        this._readyState = 2 /* DONE */;
+        this._writingProcess = null;
         this.dispatchEvent(new ProgressEvent(status));
         this.dispatchEvent(new ProgressEvent('writeend'));
     };
@@ -303,8 +318,13 @@ var StorageFileWriter = (function () {
     StorageFileWriter.prototype._write = function (write) {
         var _this = this;
         this._writeStart();
-        write(this._stream).done(function () { return _this._writeEnd('write'); }, function (err) {
-            _this.error = err;
+        this._writingProcess = write(this._stream);
+        this._writingProcess.done(function () { return _this._writeEnd('write'); }, function (err) {
+            // TODO: check whether this is required
+            if (_this._error instanceof AbortError) {
+                return;
+            }
+            _this._error = err;
             _this._writeEnd('error');
         });
     };

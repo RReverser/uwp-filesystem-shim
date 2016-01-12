@@ -11,8 +11,9 @@ class StorageFileWriter implements FileWriter {
     WRITING = ReadyState.WRITING;
     DONE = ReadyState.DONE;
 
-    readyState: number = ReadyState.INIT;
-    error: DOMError = null;
+    private _readyState: number = ReadyState.INIT;
+    private _error: DOMError = null;
+    private _writingProcess: Windows.Foundation.IPromise<any> = null;
     
     private _listeners: { [type: string]: ProgressEventHandler[] } = Object.create(null);
 
@@ -41,6 +42,14 @@ class StorageFileWriter implements FileWriter {
     onerror: ProgressEventHandler;
     onwriteend: ProgressEventHandler;
 
+    get readyState() {
+        return this._readyState;
+    }
+    
+    get error() {
+        return this._error;
+    }
+
     get position() {
         return this._stream.position;
     }
@@ -67,20 +76,16 @@ class StorageFileWriter implements FileWriter {
     }
 
     abort() {
-        if (this.readyState === ReadyState.DONE || this.readyState === ReadyState.INIT) {
+        if (this._readyState === ReadyState.DONE || this._readyState === ReadyState.INIT) {
             return;
         }
-        this.readyState = ReadyState.DONE;
-
-        throw new NotImplementedError();
-
-        this.error = new AbortError();
-        this.dispatchEvent(new ProgressEvent('abort'));
-        this.dispatchEvent(new ProgressEvent('writeend'));
+        this._writingProcess.cancel();
+        this._error = new AbortError();
+        this._writeEnd('abort');
     }
 
     seek(offset: number) {
-        if (this.readyState === ReadyState.WRITING) {
+        if (this._readyState === ReadyState.WRITING) {
             throw new InvalidStateError();
         }
         let { length } = this;
@@ -97,15 +102,17 @@ class StorageFileWriter implements FileWriter {
     }
 
     private _writeStart() {
-        if (this.readyState === ReadyState.WRITING) {
+        if (this._readyState === ReadyState.WRITING) {
             throw new InvalidStateError();
         }
-        this.readyState = ReadyState.WRITING;
+        this._readyState = ReadyState.WRITING;
+        this._error = null;
         this.dispatchEvent(new ProgressEvent('writestart'));
     }
 
     private _writeEnd(status: string): void {
-        this.readyState = ReadyState.DONE;
+        this._readyState = ReadyState.DONE;
+        this._writingProcess = null;
         this.dispatchEvent(new ProgressEvent(status));
         this.dispatchEvent(new ProgressEvent('writeend'));
     }
@@ -120,10 +127,15 @@ class StorageFileWriter implements FileWriter {
 
     private _write(write: (stream: Windows.Storage.Streams.IRandomAccessStream) => Windows.Foundation.IPromise<any>) {
         this._writeStart();
-        write(this._stream).done(
+        this._writingProcess = write(this._stream);
+        this._writingProcess.done(
             () => this._writeEnd('write'),
             err => {
-                this.error = err;
+                // TODO: check whether this is required
+                if (this._error instanceof AbortError) {
+                    return;
+                }
+                this._error = err;
                 this._writeEnd('error');
             }
         );
