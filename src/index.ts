@@ -12,16 +12,22 @@ const fileSystemResolvers = [
     return fs;
 });
 
-var requestFileSystem: typeof window.requestFileSystem = function requestFileSystem(type, size, onSuccess, onError?) {
-    onSuccess(fileSystemResolvers[type]());
-};
+var requestFileSystem =
+    window.requestFileSystem =
+    window.webkitRequestFileSystem =
+    function requestFileSystem(type, size, onSuccess, onError?) {
+        onSuccess(fileSystemResolvers[type]());
+    };
 
-var resolveLocalFileSystemURL: typeof window.resolveLocalFileSystemURL = function resolveLocalFileSystemURL(url, onSuccess, onError?) {
-    let match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
-    if (!match) {
-        onError(new SecurityError());
-    }
-    let type = match[1] === 'local' ? PERSISTENT : TEMPORARY;
-    Windows.Storage.StorageFile.getFileFromApplicationUriAsync(new Windows.Foundation.Uri(url))
-    .done(file => new StorageFileEntry(fileSystemResolvers[type](), file), onError);
-};
+var resolveLocalFileSystemURL =
+    window.resolveLocalFileSystemURL = 
+    function resolveLocalFileSystemURL(url, onSuccess, onError?) {
+        let match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
+        if (!match) {
+            onError && onError(new SecurityError());
+            return;
+        }
+        let type = match[1] === 'local' ? PERSISTENT : TEMPORARY;
+        Windows.Storage.StorageFile.getFileFromApplicationUriAsync(new Windows.Foundation.Uri(url))
+        .done(file => new StorageFileEntry(fileSystemResolvers[type](), file), onError);
+    };

@@ -1,7 +1,7 @@
-class AbortError extends DOMError {}
-class InvalidStateError extends DOMError {}
-class NoModificationAllowedError extends DOMError {}
-class SecurityError extends DOMError {}
+class AbortError extends Error {}
+class InvalidStateError extends Error {}
+class NoModificationAllowedError extends Error {}
+class SecurityError extends Error {}
 
 class NotImplementedError extends Error {
     constructor() {
