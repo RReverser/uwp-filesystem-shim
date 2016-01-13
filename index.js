@@ -2,207 +2,196 @@ try {
     new ProgressEvent('test');
 }
 catch (err) {
-    var proto = ProgressEvent.prototype;
-    ProgressEvent = proto.constructor = function (type, eventInitDict) {
-        if (eventInitDict === void 0) { eventInitDict = {}; }
-        var event = document.createEvent('ProgressEvent');
+    let proto = ProgressEvent.prototype;
+    ProgressEvent = proto.constructor = function (type, eventInitDict = {}) {
+        let event = document.createEvent('ProgressEvent');
         event.initProgressEvent(type, eventInitDict.bubbles, eventInitDict.cancelable, eventInitDict.lengthComputable, eventInitDict.loaded, eventInitDict.total);
         return event;
     };
     ProgressEvent.prototype = proto;
 }
-var __extends = (this && this.__extends) || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
-};
-var AbortError = (function (_super) {
-    __extends(AbortError, _super);
-    function AbortError() {
-        _super.apply(this, arguments);
+class ProgressEventTarget {
+    constructor() {
+        this._listeners = Object.create(null);
+        this.constructor._privateListenerKeys.forEach(privateKey => {
+            this[privateKey] = null;
+        });
     }
-    return AbortError;
-})(DOMError);
-var InvalidStateError = (function (_super) {
-    __extends(InvalidStateError, _super);
-    function InvalidStateError() {
-        _super.apply(this, arguments);
+    addEventListener(type, listener) {
+        if (typeof listener === 'function') {
+            this._listeners[type].add(listener);
+        }
     }
-    return InvalidStateError;
-})(DOMError);
-var NoModificationAllowedError = (function (_super) {
-    __extends(NoModificationAllowedError, _super);
-    function NoModificationAllowedError() {
-        _super.apply(this, arguments);
+    dispatchEvent(event) {
+        this._listeners[event.type].forEach(listener => listener.call(this, event));
+        return !event.defaultPrevented;
     }
-    return NoModificationAllowedError;
-})(DOMError);
-var SecurityError = (function (_super) {
-    __extends(SecurityError, _super);
-    function SecurityError() {
-        _super.apply(this, arguments);
+    removeEventListener(type, listener) {
+        this._listeners[type].delete(listener);
     }
-    return SecurityError;
-})(DOMError);
-var NotImplementedError = (function (_super) {
-    __extends(NotImplementedError, _super);
-    function NotImplementedError() {
-        _super.call(this, 'Not implemented.');
+}
+function progressEvent(target, key) {
+    const privateKey = `_${key}`;
+    let Ctor = target.constructor;
+    (Ctor._privateListenerKeys || (Ctor._privateListenerKeys = [])).push(privateKey);
+    const type = key.slice(2);
+    Object.defineProperty(target, key, {
+        get() {
+            return this[privateKey];
+        },
+        set(handler) {
+            // .onstuff = ... firstly removes the old handler if present
+            let normalizedHandler = this[privateKey];
+            if (normalizedHandler !== null) {
+                this.removeEventListener(type, normalizedHandler);
+            }
+            if (typeof handler === 'function') {
+                // then adds the new handler if it's callable
+                normalizedHandler = target => {
+                    if (handler.call(target, event) === false) {
+                        event.preventDefault();
+                    }
+                };
+                this.addEventListener(type, normalizedHandler);
+            }
+            else {
+                // or simply sets .onstuff value to null if non-callable
+                normalizedHandler = null;
+            }
+            this[privateKey] = normalizedHandler;
+        }
+    });
+}
+class AbortError extends DOMError {
+}
+class InvalidStateError extends DOMError {
+}
+class NoModificationAllowedError extends DOMError {
+}
+class SecurityError extends DOMError {
+}
+class NotImplementedError extends Error {
+    constructor() {
+        super('Not implemented.');
     }
-    return NotImplementedError;
-})(Error);
-var StorageEntry = (function () {
-    function StorageEntry(_filesystem, _storageItem) {
+}
+class StorageEntry {
+    constructor(_filesystem, _storageItem) {
         this._filesystem = _filesystem;
         this._storageItem = _storageItem;
     }
-    Object.defineProperty(StorageEntry.prototype, "isFile", {
-        get: function () {
-            return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.file);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(StorageEntry.prototype, "isDirectory", {
-        get: function () {
-            return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.folder);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(StorageEntry.prototype, "name", {
-        get: function () {
-            return this._storageItem.name;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(StorageEntry.prototype, "fullPath", {
-        get: function () {
-            return this._storageItem.path;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(StorageEntry.prototype, "filesystem", {
-        get: function () {
-            return this._filesystem;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    StorageEntry.from = function (filesystem, storageItem) {
-        var CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
-        return new CustomStorageEntry(filesystem, storageItem);
-    };
-    StorageEntry.prototype.getMetadata = function (onSuccess, onError) {
-        this._storageItem.getBasicPropertiesAsync().done(function (props) { return onSuccess({ modificationTime: props.dateModified, size: props.size }); }, onError);
-    };
-    StorageEntry.prototype.moveTo = function (parent, newName, onSuccess, onError) {
-        throw new NotImplementedError();
-    };
-    StorageEntry.prototype.copyTo = function (parent, newName, onSuccess, onError) {
-        throw new NotImplementedError();
-    };
-    StorageEntry.prototype.toURL = function () {
-        var fs = this._filesystem;
-        return "ms-appdata:///" + fs.name + "/" + this._storageItem.path.slice(fs.root.fullPath.length + 1).replace(/\\/g, '/');
-    };
-    StorageEntry.prototype.remove = function (onSuccess, onError) {
-        this._storageItem.deleteAsync().done(onSuccess, onError);
-    };
-    StorageEntry.prototype.getParent = function (onSuccess, onError) {
-        var _this = this;
-        this._storageItem.getParentAsync().done(function (parent) { return onSuccess(parent ? new StorageDirectoryEntry(_this._filesystem, parent) : _this._filesystem.root); }, onError);
-    };
-    return StorageEntry;
-})();
-var StorageDirectoryEntry = (function (_super) {
-    __extends(StorageDirectoryEntry, _super);
-    function StorageDirectoryEntry() {
-        _super.apply(this, arguments);
+    get isFile() {
+        return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.file);
     }
-    StorageDirectoryEntry.prototype.createReader = function () {
+    get isDirectory() {
+        return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.folder);
+    }
+    get name() {
+        return this._storageItem.name;
+    }
+    get fullPath() {
+        return this._storageItem.path;
+    }
+    get filesystem() {
+        return this._filesystem;
+    }
+    static from(filesystem, storageItem) {
+        let CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
+        return new CustomStorageEntry(filesystem, storageItem);
+    }
+    getMetadata(onSuccess, onError) {
+        this._storageItem.getBasicPropertiesAsync().done(props => onSuccess({ modificationTime: props.dateModified, size: props.size }), onError);
+    }
+    moveTo(parent, newName, onSuccess, onError) {
+        throw new NotImplementedError();
+    }
+    copyTo(parent, newName, onSuccess, onError) {
+        throw new NotImplementedError();
+    }
+    toURL() {
+        let fs = this._filesystem;
+        return `ms-appdata:///${fs.name}/${this._storageItem.path.slice(fs.root.fullPath.length + 1).replace(/\\/g, '/')}`;
+    }
+    remove(onSuccess, onError) {
+        this._storageItem.deleteAsync().done(onSuccess, onError);
+    }
+    getParent(onSuccess, onError) {
+        this._storageItem.getParentAsync().done(parent => onSuccess(parent ? new StorageDirectoryEntry(this._filesystem, parent) : this._filesystem.root), onError);
+    }
+}
+class StorageDirectoryEntry extends StorageEntry {
+    createReader() {
         return new StorageDirectoryReader(this._filesystem, this._storageItem);
-    };
-    StorageDirectoryEntry.prototype._getItem = function (createItemAsync, getItemAsync, path, options, onSuccess, onError) {
-        var _this = this;
-        var collisionOpt = Windows.Storage.CreationCollisionOption;
+    }
+    _getItem(createItemAsync, getItemAsync, path, options, onSuccess, onError) {
+        let collisionOpt = Windows.Storage.CreationCollisionOption;
         (options.create
             ? createItemAsync.call(this._storageItem, path, options.exclusive ? collisionOpt.failIfExists : collisionOpt.openIfExists)
-            : getItemAsync.call(this._storageItem, path)).done(function (storageItem) { return onSuccess(StorageEntry.from(_this._filesystem, storageItem)); }, onError);
-    };
-    StorageDirectoryEntry.prototype.getFile = function (path, options, onSuccess, onError) {
+            : getItemAsync.call(this._storageItem, path)).done((storageItem) => onSuccess(StorageEntry.from(this._filesystem, storageItem)), onError);
+    }
+    getFile(path, options, onSuccess, onError) {
         this._getItem(this._storageItem.createFileAsync, this._storageItem.getFileAsync, path, options, onSuccess, onError);
-    };
-    StorageDirectoryEntry.prototype.getDirectory = function (path, options, onSuccess, onError) {
+    }
+    getDirectory(path, options, onSuccess, onError) {
         this._getItem(this._storageItem.createFolderAsync, this._storageItem.getFolderAsync, path, options, onSuccess, onError);
-    };
-    StorageDirectoryEntry.prototype.remove = function (onSuccess, onError) {
-        var _this = this;
-        this._storageItem.getItemsAsync(0, 1).then(function (_a) {
-            var length = _a.length;
+    }
+    remove(onSuccess, onError) {
+        this._storageItem.getItemsAsync(0, 1).then(({ length }) => {
             if (length > 0) {
                 onError && onError(new NoModificationAllowedError());
                 return;
             }
-            return _super.prototype.remove.call(_this, onSuccess, onError);
+            return super.remove(onSuccess, onError);
         });
-    };
-    StorageDirectoryEntry.prototype.removeRecursively = function (onSuccess, onError) {
+    }
+    removeRecursively(onSuccess, onError) {
         this.remove(onSuccess, onError);
-    };
-    return StorageDirectoryEntry;
-})(StorageEntry);
-var StorageDirectoryReader = (function () {
-    function StorageDirectoryReader(_filesystem, _storageFolder) {
+    }
+}
+class StorageDirectoryReader {
+    constructor(_filesystem, _storageFolder) {
         this._filesystem = _filesystem;
         this._storageFolder = _storageFolder;
         this._read = false;
     }
-    StorageDirectoryReader.prototype.readEntries = function (onSuccess, onError) {
-        var _this = this;
+    readEntries(onSuccess, onError) {
         this._read = true;
-        this._storageFolder.getItemsAsync().done(function (items) { return onSuccess(items.map(function (item) { return StorageEntry.from(_this._filesystem, item); })); }, onError);
-    };
-    return StorageDirectoryReader;
-})();
-var StorageFileEntry = (function (_super) {
-    __extends(StorageFileEntry, _super);
-    function StorageFileEntry() {
-        _super.apply(this, arguments);
+        this._storageFolder.getItemsAsync().done(items => onSuccess(items.map(item => StorageEntry.from(this._filesystem, item))), onError);
     }
-    StorageFileEntry.prototype.createWriter = function (onSuccess, onError) {
+}
+class StorageFileEntry extends StorageEntry {
+    createWriter(onSuccess, onError) {
         this._storageItem.openAsync(Windows.Storage.FileAccessMode.readWrite)
-            .then(function (stream) { return new StorageFileWriter(stream); })
+            .then(stream => new StorageFileWriter(stream))
             .done(onSuccess, onError);
-    };
-    StorageFileEntry.prototype.file = function (onSuccess, onError) {
-        var _this = this;
-        new WinJS.Promise(function (resolve) { return resolve(MSApp.createFileFromStorageFile(_this._storageItem)); })
+    }
+    file(onSuccess, onError) {
+        new WinJS.Promise(resolve => resolve(MSApp.createFileFromStorageFile(this._storageItem)))
             .done(onSuccess, onError);
-    };
-    StorageFileEntry.prototype.moveTo = function (parent, newName, onSuccess, onError) {
-        var _this = this;
-        this._storageItem.moveAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists).done(function () { return onSuccess(_this); }, onError);
-    };
-    StorageFileEntry.prototype.copyTo = function (parent, newName, onSuccess, onError) {
-        var _this = this;
-        this._storageItem.copyAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists).done(function () { return onSuccess(_this); }, onError);
-    };
-    return StorageFileEntry;
-})(StorageEntry);
-var StorageFileSystem = (function () {
-    function StorageFileSystem(name, storageFolder) {
+    }
+    moveTo(parent, newName, onSuccess, onError) {
+        this._storageItem.moveAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists).done(() => onSuccess(this), onError);
+    }
+    copyTo(parent, newName, onSuccess, onError) {
+        this._storageItem.copyAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists).done(() => onSuccess(this), onError);
+    }
+}
+class StorageFileSystem {
+    constructor(name, storageFolder) {
         this.name = name;
         this.root = new StorageDirectoryEntry(this, storageFolder);
     }
-    return StorageFileSystem;
-})();
+}
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
 ;
-var StorageFileWriter = (function () {
-    function StorageFileWriter(_stream) {
-        var _this = this;
+class StorageFileWriter extends ProgressEventTarget {
+    constructor(_stream) {
+        super();
         this._stream = _stream;
         this.INIT = 0 /* INIT */;
         this.WRITING = 1 /* WRITING */;
@@ -210,79 +199,32 @@ var StorageFileWriter = (function () {
         this._readyState = 0 /* INIT */;
         this._error = null;
         this._writingProcess = null;
-        this._listeners = Object.create(null);
-        ['writestart', 'progress', 'write', 'abort', 'error', 'writeend'].forEach(function (type) {
-            var name = "on" + type;
-            var progressEvents = _this;
-            progressEvents[name] = null;
-            _this._listeners[type] = [function (event) {
-                    var handler = progressEvents[name];
-                    if (typeof handler === 'function') {
-                        var result = handler.call(_this, event);
-                        if (result === false) {
-                            event.preventDefault();
-                        }
-                    }
-                }];
-        });
     }
-    StorageFileWriter.prototype.addEventListener = function (type, listener) {
-        this._listeners[type].push(listener);
-    };
-    StorageFileWriter.prototype.dispatchEvent = function (event) {
-        this._listeners[event.type].forEach(function (listener) {
-            listener.call(this, event);
-        }, this);
-        return event.defaultPrevented;
-    };
-    StorageFileWriter.prototype.removeEventListener = function (type, listener) {
-        var listeners = this._listeners[type];
-        var index = listeners.indexOf(listener);
-        if (index < 0)
-            return;
-        listeners.splice(index, 1);
-    };
-    Object.defineProperty(StorageFileWriter.prototype, "readyState", {
-        get: function () {
-            return this._readyState;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(StorageFileWriter.prototype, "error", {
-        get: function () {
-            return this._error;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(StorageFileWriter.prototype, "position", {
-        get: function () {
-            return this._stream.position;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    Object.defineProperty(StorageFileWriter.prototype, "length", {
-        get: function () {
-            return this._stream.size;
-        },
-        enumerable: true,
-        configurable: true
-    });
-    StorageFileWriter.prototype.abort = function () {
+    get readyState() {
+        return this._readyState;
+    }
+    get error() {
+        return this._error;
+    }
+    get position() {
+        return this._stream.position;
+    }
+    get length() {
+        return this._stream.size;
+    }
+    abort() {
         if (this._readyState === 2 /* DONE */ || this._readyState === 0 /* INIT */) {
             return;
         }
         this._writingProcess.cancel();
         this._error = new AbortError();
         this._writeEnd('abort');
-    };
-    StorageFileWriter.prototype.seek = function (offset) {
+    }
+    seek(offset) {
         if (this._readyState === 1 /* WRITING */) {
             throw new InvalidStateError();
         }
-        var length = this.length;
+        let { length } = this;
         if (offset > length) {
             offset = length;
         }
@@ -293,79 +235,88 @@ var StorageFileWriter = (function () {
             offset = 0;
         }
         this._stream.seek(offset);
-    };
-    StorageFileWriter.prototype._writeStart = function () {
+    }
+    _writeStart() {
         if (this._readyState === 1 /* WRITING */) {
             throw new InvalidStateError();
         }
         this._readyState = 1 /* WRITING */;
         this._error = null;
         this.dispatchEvent(new ProgressEvent('writestart'));
-    };
-    StorageFileWriter.prototype._writeEnd = function (status) {
+    }
+    _writeEnd(status) {
         this._readyState = 2 /* DONE */;
         this._writingProcess = null;
         this.dispatchEvent(new ProgressEvent(status));
         this.dispatchEvent(new ProgressEvent('writeend'));
-    };
-    StorageFileWriter.prototype._writeProgress = function (loaded, total) {
+    }
+    _writeProgress(loaded, total) {
         this.dispatchEvent(new ProgressEvent('progress', {
             lengthComputable: true,
-            loaded: loaded,
-            total: total
+            loaded,
+            total
         }));
-    };
-    StorageFileWriter.prototype._write = function (write) {
-        var _this = this;
+    }
+    _write(write) {
         this._writeStart();
         this._writingProcess = write(this._stream);
-        this._writingProcess.done(function () { return _this._writeEnd('write'); }, function (err) {
+        this._writingProcess.done(() => this._writeEnd('write'), err => {
             // TODO: check whether this is required
-            if (_this._error instanceof AbortError) {
+            if (this._error instanceof AbortError) {
                 return;
             }
-            _this._error = err;
-            _this._writeEnd('error');
+            this._error = err;
+            this._writeEnd('error');
         });
-    };
-    StorageFileWriter.prototype.truncate = function (newLength) {
-        var _this = this;
-        this._write(function (stream) {
+    }
+    truncate(newLength) {
+        this._write(stream => {
             stream.size = newLength;
-            return stream.flushAsync().then(function () {
-                if (_this._stream.position > newLength) {
-                    _this._stream.position = newLength;
+            return stream.flushAsync().then(() => {
+                if (this._stream.position > newLength) {
+                    this._stream.position = newLength;
                 }
             });
         });
-    };
-    StorageFileWriter.prototype.write = function (data) {
-        var _this = this;
-        var size = data.size;
-        this._write(function (stream) { return Windows.Storage.Streams.RandomAccessStream.copyAsync(data.msDetachStream(), stream).then(function () { return _this._writeProgress(size, size); }, null, function (written) { return _this._writeProgress(written, size); }); });
-    };
-    return StorageFileWriter;
-})();
-var TEMPORARY = 0;
-var PERSISTENT = 1;
-var appData = Windows.Storage.ApplicationData.current;
-var fileSystemResolvers = [
-    function () { return new StorageFileSystem('temp', appData.temporaryFolder); },
-    function () { return new StorageFileSystem('local', appData.localFolder); }
-].map(function (createFS, i, resolvers) { return function () {
-    var fs = createFS();
-    resolvers[i] = function () { return fs; };
-    return fs;
-}; });
+    }
+    write(data) {
+        let { size } = data;
+        this._write(stream => Windows.Storage.Streams.RandomAccessStream.copyAsync(data.msDetachStream(), stream).then(() => this._writeProgress(size, size), null, written => this._writeProgress(written, size)));
+    }
+}
+__decorate([
+    progressEvent
+], StorageFileWriter.prototype, "onwritestart", void 0);
+__decorate([
+    progressEvent
+], StorageFileWriter.prototype, "onprogress", void 0);
+__decorate([
+    progressEvent
+], StorageFileWriter.prototype, "onwrite", void 0);
+__decorate([
+    progressEvent
+], StorageFileWriter.prototype, "onabort", void 0);
+__decorate([
+    progressEvent
+], StorageFileWriter.prototype, "onerror", void 0);
+__decorate([
+    progressEvent
+], StorageFileWriter.prototype, "onwriteend", void 0);
+const TEMPORARY = 0;
+const PERSISTENT = 1;
+const appData = Windows.Storage.ApplicationData.current;
+const fileSystems = [
+    new StorageFileSystem('temp', appData.temporaryFolder),
+    new StorageFileSystem('local', appData.localFolder)
+];
 var requestFileSystem = function requestFileSystem(type, size, onSuccess, onError) {
-    onSuccess(fileSystemResolvers[type]());
+    onSuccess(fileSystems[type]);
 };
 var resolveLocalFileSystemURL = function resolveLocalFileSystemURL(url, onSuccess, onError) {
-    var match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
+    let match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
     if (!match) {
         onError(new SecurityError());
     }
-    var type = match[1] === 'local' ? PERSISTENT : TEMPORARY;
     Windows.Storage.StorageFile.getFileFromApplicationUriAsync(new Windows.Foundation.Uri(url))
-        .done(function (file) { return new StorageFileEntry(fileSystemResolvers[type](), file); }, onError);
+        .done(file => new StorageFileEntry(fileSystems[match[1] === 'local' ? 1 : 0], file), onError);
 };
