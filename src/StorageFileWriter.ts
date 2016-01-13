@@ -5,13 +5,13 @@ const enum ReadyState {
 };
 
 class StorageFileWriter extends ProgressEventTarget implements FileWriter {
-    static INIT = ReadyState.INIT;
-    static WRITING = ReadyState.WRITING;
-    static DONE = ReadyState.DONE;
+    @readonly static INIT = ReadyState.INIT;
+    @readonly static WRITING = ReadyState.WRITING;
+    @readonly static DONE = ReadyState.DONE;
     
-    INIT = ReadyState.INIT;
-    WRITING = ReadyState.WRITING;
-    DONE = ReadyState.DONE;
+    @readonly INIT = ReadyState.INIT;
+    @readonly WRITING = ReadyState.WRITING;
+    @readonly DONE = ReadyState.DONE;
 
     private _readyState: number = ReadyState.INIT;
     private _error: DOMError = null;

@@ -1,19 +1,17 @@
-interface URL extends Location {}
-
 namespace Windows.Storage {
     export interface IStorageItem2 extends IStorageItem {
         getParentAsync(): Windows.Foundation.IAsyncOperation<IStorageFolder>;
     }
 }
 
+function createStorageEntry(filesystem: StorageFileSystem, storageItem: Windows.Storage.IStorageItem): StorageEntry {
+    let CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
+    return new CustomStorageEntry(filesystem, storageItem);    
+}
+
 class StorageEntry implements Entry {
-    get isFile() {
-        return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.file);
-    }
-    
-    get isDirectory() {
-        return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.folder);
-    }
+    @readonly isFile: boolean;
+    @readonly isDirectory: boolean;
     
     get name() {
         return this._storageItem.name;
@@ -23,15 +21,10 @@ class StorageEntry implements Entry {
         return this._storageItem.path;
     }
     
-    get filesystem() {
-        return this._filesystem;
-    }
+    @readonly filesystem: StorageFileSystem;
     
-    constructor(protected _filesystem: StorageFileSystem, public _storageItem: Windows.Storage.IStorageItem) {}
-    
-    static from(filesystem: StorageFileSystem, storageItem: Windows.Storage.IStorageItem): StorageEntry {
-        let CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
-        return new CustomStorageEntry(filesystem, storageItem);
+    constructor(filesystem: StorageFileSystem, public _storageItem: Windows.Storage.IStorageItem) {
+        this.filesystem = filesystem;
     }
     
     getMetadata(onSuccess: MetadataCallback, onError?: ErrorCallback) {
@@ -50,7 +43,7 @@ class StorageEntry implements Entry {
     }
     
     toURL() {
-        let fs = this._filesystem;
+        let fs = this.filesystem;
         return `ms-appdata:///${fs.name}/${this._storageItem.path.slice(fs.root.fullPath.length + 1).replace(/\\/g, '/')}`;
     }
     
@@ -60,7 +53,7 @@ class StorageEntry implements Entry {
     
     getParent(onSuccess: DirectoryEntryCallback, onError?: ErrorCallback) {
         (<Windows.Storage.IStorageItem2>this._storageItem).getParentAsync().done(
-            parent => onSuccess(parent ? new StorageDirectoryEntry(this._filesystem, parent) : this._filesystem.root),
+            parent => onSuccess(parent ? new StorageDirectoryEntry(this.filesystem, parent) : this.filesystem.root),
             onError
         );
     }

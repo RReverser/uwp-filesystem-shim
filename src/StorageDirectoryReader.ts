@@ -6,7 +6,7 @@ class StorageDirectoryReader implements DirectoryReader {
     readEntries(onSuccess: EntriesCallback, onError?: ErrorCallback) {
         this._read = true;
         this._storageFolder.getItemsAsync().done(
-            items => onSuccess(items.map(item => StorageEntry.from(this._filesystem, item))),
+            items => onSuccess(items.map(item => createStorageEntry(this._filesystem, item))),
             onError
         );
     }

@@ -1,7 +1,9 @@
 class StorageFileSystem implements FileSystem {
-    root: StorageDirectoryEntry;
+    @readonly name: string;
+    @readonly root: StorageDirectoryEntry;
     
-    constructor(public name: string, storageFolder: Windows.Storage.IStorageFolder) {
+    constructor(name: string, storageFolder: Windows.Storage.IStorageFolder) {
+        this.name = name;
         this.root = new StorageDirectoryEntry(this, storageFolder);
     }
 }

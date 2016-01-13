@@ -1,8 +1,10 @@
 class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
-    public _storageItem: Windows.Storage.IStorageFolder;
+    _storageItem: Windows.Storage.IStorageFolder;
+    isFile = false;
+    isDirectory = true;
     
     createReader() {
-        return new StorageDirectoryReader(this._filesystem, this._storageItem);
+        return new StorageDirectoryReader(this.filesystem, this._storageItem);
     }
     
     private _getItem<T extends Windows.Storage.IStorageItem>(
@@ -19,7 +21,7 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
             ? createItemAsync.call(this._storageItem, path, options.exclusive ? collisionOpt.failIfExists : collisionOpt.openIfExists)
             : getItemAsync.call(this._storageItem, path)
         ).done(
-            (storageItem: T) => onSuccess(StorageEntry.from(this._filesystem, storageItem)),
+            (storageItem: T) => onSuccess(createStorageEntry(this.filesystem, storageItem)),
             onError
         );
     }

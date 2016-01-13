@@ -1,5 +1,7 @@
 class StorageFileEntry extends StorageEntry implements FileEntry {
-    public _storageItem: Windows.Storage.IStorageFile;
+    _storageItem: Windows.Storage.IStorageFile;
+    isFile = true;
+    isDirectory = false;
     
     createWriter(onSuccess: FileWriterCallback, onError?: ErrorCallback) {
         this._storageItem.openAsync(Windows.Storage.FileAccessMode.readWrite)

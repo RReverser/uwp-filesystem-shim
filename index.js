@@ -13,8 +13,9 @@ catch (err) {
 class ProgressEventTarget {
     constructor() {
         this._listeners = Object.create(null);
-        this.constructor._privateListenerKeys.forEach(privateKey => {
-            this[privateKey] = null;
+        this.constructor._eventTypes.forEach(type => {
+            this._listeners[type] = new Set();
+            this[`_on${type}`] = null;
         });
     }
     addEventListener(type, listener) {
@@ -29,38 +30,42 @@ class ProgressEventTarget {
     removeEventListener(type, listener) {
         this._listeners[type].delete(listener);
     }
+    static _defineEventAttr(key) {
+        const type = key.slice(2);
+        const privateKey = `_${key}`;
+        (this._eventTypes || (this._eventTypes = [])).push(type);
+        Object.defineProperty(this.prototype, key, {
+            configurable: true,
+            enumerable: true,
+            get() {
+                return this[privateKey];
+            },
+            set(handler) {
+                // .onstuff = ... firstly removes the old handler if present
+                let normalizedHandler = this[privateKey];
+                if (normalizedHandler !== null) {
+                    this.removeEventListener(type, normalizedHandler);
+                }
+                if (typeof handler === 'function') {
+                    // then adds the new handler if it's callable
+                    normalizedHandler = target => {
+                        if (handler.call(target, event) === false) {
+                            event.preventDefault();
+                        }
+                    };
+                    this.addEventListener(type, normalizedHandler);
+                }
+                else {
+                    // or simply sets .onstuff value to null if non-callable
+                    normalizedHandler = null;
+                }
+                this[privateKey] = normalizedHandler;
+            }
+        });
+    }
 }
 function progressEvent(target, key) {
-    const privateKey = `_${key}`;
-    let Ctor = target.constructor;
-    (Ctor._privateListenerKeys || (Ctor._privateListenerKeys = [])).push(privateKey);
-    const type = key.slice(2);
-    Object.defineProperty(target, key, {
-        get() {
-            return this[privateKey];
-        },
-        set(handler) {
-            // .onstuff = ... firstly removes the old handler if present
-            let normalizedHandler = this[privateKey];
-            if (normalizedHandler !== null) {
-                this.removeEventListener(type, normalizedHandler);
-            }
-            if (typeof handler === 'function') {
-                // then adds the new handler if it's callable
-                normalizedHandler = target => {
-                    if (handler.call(target, event) === false) {
-                        event.preventDefault();
-                    }
-                };
-                this.addEventListener(type, normalizedHandler);
-            }
-            else {
-                // or simply sets .onstuff value to null if non-callable
-                normalizedHandler = null;
-            }
-            this[privateKey] = normalizedHandler;
-        }
-    });
+    target.constructor._defineEventAttr(key);
 }
 class AbortError extends DOMError {
 }
@@ -75,29 +80,39 @@ class NotImplementedError extends Error {
         super('Not implemented.');
     }
 }
+function readonly(target, key) {
+    Object.defineProperty(target, key, {
+        configurable: true,
+        enumerable: true,
+        set(value) {
+            Object.defineProperty(this, key, {
+                configurable: false,
+                enumerable: true,
+                value
+            });
+        }
+    });
+}
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+function createStorageEntry(filesystem, storageItem) {
+    let CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
+    return new CustomStorageEntry(filesystem, storageItem);
+}
 class StorageEntry {
-    constructor(_filesystem, _storageItem) {
-        this._filesystem = _filesystem;
+    constructor(filesystem, _storageItem) {
         this._storageItem = _storageItem;
-    }
-    get isFile() {
-        return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.file);
-    }
-    get isDirectory() {
-        return this._storageItem.isOfType(Windows.Storage.StorageItemTypes.folder);
+        this.filesystem = filesystem;
     }
     get name() {
         return this._storageItem.name;
     }
     get fullPath() {
         return this._storageItem.path;
-    }
-    get filesystem() {
-        return this._filesystem;
-    }
-    static from(filesystem, storageItem) {
-        let CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
-        return new CustomStorageEntry(filesystem, storageItem);
     }
     getMetadata(onSuccess, onError) {
         this._storageItem.getBasicPropertiesAsync().done(props => onSuccess({ modificationTime: props.dateModified, size: props.size }), onError);
@@ -109,25 +124,39 @@ class StorageEntry {
         throw new NotImplementedError();
     }
     toURL() {
-        let fs = this._filesystem;
+        let fs = this.filesystem;
         return `ms-appdata:///${fs.name}/${this._storageItem.path.slice(fs.root.fullPath.length + 1).replace(/\\/g, '/')}`;
     }
     remove(onSuccess, onError) {
         this._storageItem.deleteAsync().done(onSuccess, onError);
     }
     getParent(onSuccess, onError) {
-        this._storageItem.getParentAsync().done(parent => onSuccess(parent ? new StorageDirectoryEntry(this._filesystem, parent) : this._filesystem.root), onError);
+        this._storageItem.getParentAsync().done(parent => onSuccess(parent ? new StorageDirectoryEntry(this.filesystem, parent) : this.filesystem.root), onError);
     }
 }
+__decorate([
+    readonly
+], StorageEntry.prototype, "isFile", void 0);
+__decorate([
+    readonly
+], StorageEntry.prototype, "isDirectory", void 0);
+__decorate([
+    readonly
+], StorageEntry.prototype, "filesystem", void 0);
 class StorageDirectoryEntry extends StorageEntry {
+    constructor(...args) {
+        super(...args);
+        this.isFile = false;
+        this.isDirectory = true;
+    }
     createReader() {
-        return new StorageDirectoryReader(this._filesystem, this._storageItem);
+        return new StorageDirectoryReader(this.filesystem, this._storageItem);
     }
     _getItem(createItemAsync, getItemAsync, path, options, onSuccess, onError) {
         let collisionOpt = Windows.Storage.CreationCollisionOption;
         (options.create
             ? createItemAsync.call(this._storageItem, path, options.exclusive ? collisionOpt.failIfExists : collisionOpt.openIfExists)
-            : getItemAsync.call(this._storageItem, path)).done((storageItem) => onSuccess(StorageEntry.from(this._filesystem, storageItem)), onError);
+            : getItemAsync.call(this._storageItem, path)).done((storageItem) => onSuccess(createStorageEntry(this.filesystem, storageItem)), onError);
     }
     getFile(path, options, onSuccess, onError) {
         this._getItem(this._storageItem.createFileAsync, this._storageItem.getFileAsync, path, options, onSuccess, onError);
@@ -156,10 +185,15 @@ class StorageDirectoryReader {
     }
     readEntries(onSuccess, onError) {
         this._read = true;
-        this._storageFolder.getItemsAsync().done(items => onSuccess(items.map(item => StorageEntry.from(this._filesystem, item))), onError);
+        this._storageFolder.getItemsAsync().done(items => onSuccess(items.map(item => createStorageEntry(this._filesystem, item))), onError);
     }
 }
 class StorageFileEntry extends StorageEntry {
+    constructor(...args) {
+        super(...args);
+        this.isFile = true;
+        this.isDirectory = false;
+    }
     createWriter(onSuccess, onError) {
         this._storageItem.openAsync(Windows.Storage.FileAccessMode.readWrite)
             .then(stream => new StorageFileWriter(stream))
@@ -182,12 +216,12 @@ class StorageFileSystem {
         this.root = new StorageDirectoryEntry(this, storageFolder);
     }
 }
-var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
-    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
-    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
-    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
-    return c > 3 && r && Object.defineProperty(target, key, r), r;
-};
+__decorate([
+    readonly
+], StorageFileSystem.prototype, "name", void 0);
+__decorate([
+    readonly
+], StorageFileSystem.prototype, "root", void 0);
 ;
 class StorageFileWriter extends ProgressEventTarget {
     constructor(_stream) {
@@ -284,6 +318,18 @@ class StorageFileWriter extends ProgressEventTarget {
         this._write(stream => Windows.Storage.Streams.RandomAccessStream.copyAsync(data.msDetachStream(), stream).then(() => this._writeProgress(size, size), null, written => this._writeProgress(written, size)));
     }
 }
+StorageFileWriter.INIT = 0 /* INIT */;
+StorageFileWriter.WRITING = 1 /* WRITING */;
+StorageFileWriter.DONE = 2 /* DONE */;
+__decorate([
+    readonly
+], StorageFileWriter.prototype, "INIT", void 0);
+__decorate([
+    readonly
+], StorageFileWriter.prototype, "WRITING", void 0);
+__decorate([
+    readonly
+], StorageFileWriter.prototype, "DONE", void 0);
 __decorate([
     progressEvent
 ], StorageFileWriter.prototype, "onwritestart", void 0);
@@ -302,21 +348,35 @@ __decorate([
 __decorate([
     progressEvent
 ], StorageFileWriter.prototype, "onwriteend", void 0);
+__decorate([
+    readonly
+], StorageFileWriter, "INIT", void 0);
+__decorate([
+    readonly
+], StorageFileWriter, "WRITING", void 0);
+__decorate([
+    readonly
+], StorageFileWriter, "DONE", void 0);
 const TEMPORARY = 0;
 const PERSISTENT = 1;
 const appData = Windows.Storage.ApplicationData.current;
-const fileSystems = [
-    new StorageFileSystem('temp', appData.temporaryFolder),
-    new StorageFileSystem('local', appData.localFolder)
-];
+const fileSystemResolvers = [
+        () => new StorageFileSystem('temp', appData.temporaryFolder),
+        () => new StorageFileSystem('local', appData.localFolder)
+].map((createFS, i, resolvers) => () => {
+    let fs = createFS();
+    resolvers[i] = () => fs;
+    return fs;
+});
 var requestFileSystem = function requestFileSystem(type, size, onSuccess, onError) {
-    onSuccess(fileSystems[type]);
+    onSuccess(fileSystemResolvers[type]());
 };
 var resolveLocalFileSystemURL = function resolveLocalFileSystemURL(url, onSuccess, onError) {
     let match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
     if (!match) {
         onError(new SecurityError());
     }
+    let type = match[1] === 'local' ? PERSISTENT : TEMPORARY;
     Windows.Storage.StorageFile.getFileFromApplicationUriAsync(new Windows.Foundation.Uri(url))
-        .done(file => new StorageFileEntry(fileSystems[match[1] === 'local' ? 1 : 0], file), onError);
+        .done(file => new StorageFileEntry(fileSystemResolvers[type](), file), onError);
 };

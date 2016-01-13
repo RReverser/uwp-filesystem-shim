@@ -12,6 +12,7 @@
 
         "src/ProgressEvent.ts",
         "src/errors.ts",
+        "src/readonly.ts",
 
         "src/StorageEntry.ts",
 
