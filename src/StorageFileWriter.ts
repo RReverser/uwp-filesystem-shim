@@ -16,6 +16,7 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     private _readyState: number = ReadyState.INIT;
     private _error: DOMError = null;
     private _writingProcess: Windows.Foundation.IPromise<any> = null;
+    private _position: number = 0;
     
     @progressEvent onwritestart: ProgressEventHandler;
     @progressEvent onprogress: ProgressEventHandler;
@@ -33,14 +34,14 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     }
 
     get position() {
-        return this._stream.position;
+        return this._position;
     }
 
     get length() {
-        return this._stream.size;
+        return this._length;
     }
 
-    constructor(private _stream: Windows.Storage.Streams.IRandomAccessStream) {
+    constructor(private _file: Windows.Storage.StorageFile, private _length: number) {
         super();
     }
 
@@ -67,7 +68,7 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
         if (offset < 0) {
             offset = 0;
         }
-        this._stream.seek(offset);
+        this._position = offset;
     }
 
     private _writeStart() {
@@ -77,6 +78,7 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
         this._readyState = ReadyState.WRITING;
         this._error = null;
         this.dispatchEvent(new ProgressEvent('writestart'));
+        return this._file.openAsync(Windows.Storage.FileAccessMode.readWrite);
     }
 
     private _writeEnd(status: string): void {
@@ -94,9 +96,28 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
         }));
     }
 
-    private _write(write: (stream: Windows.Storage.Streams.IRandomAccessStream) => Windows.Foundation.IPromise<any>) {
+    private _write(write: (stream: Windows.Storage.Streams.IRandomAccessStream) => void) {
         this._writeStart();
-        this._writingProcess = write(this._stream);
+        this._writingProcess = this._writeStart().then(stream => {
+            let position = this._position;
+            let length = this._length = stream.size;
+            if (position > length) {
+                position = this._position = length;
+            }
+            stream.seek(position);
+            return (
+                WinJS.Promise.wrap(stream)
+                .then(write)
+                .then(() => stream.flushAsync())
+                .then(() => {}, err => err)
+                .then(err => {
+                    this._length = stream.size;
+                    this._position = Math.min(stream.position, this._length);
+                    stream.close();
+                    return err && WinJS.Promise.wrapError(err);
+                })
+            );
+        });
         this._writingProcess.done(
             () => this._writeEnd('write'),
             err => {
@@ -113,11 +134,6 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     truncate(newLength: number) {
         this._write(stream => {
             stream.size = newLength;
-            return stream.flushAsync().then(() => {
-                if (this._stream.position > newLength) {
-                    this._stream.position = newLength;
-                }
-            });
         });
     }
 

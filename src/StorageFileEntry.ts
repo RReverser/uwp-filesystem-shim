@@ -1,11 +1,11 @@
 class StorageFileEntry extends StorageEntry implements FileEntry {
-    _storageItem: Windows.Storage.IStorageFile;
+    _storageItem: Windows.Storage.StorageFile;
     isFile = true;
     isDirectory = false;
     
-    createWriter(onSuccess: FileWriterCallback, onError?: ErrorCallback) {
-        this._storageItem.openAsync(Windows.Storage.FileAccessMode.readWrite)
-        .then(stream => new StorageFileWriter(stream))
+    createWriter(onSuccess: FileWriterCallback, onError: ErrorCallback = noop) {
+        this._storageItem.getBasicPropertiesAsync()
+        .then(props => new StorageFileWriter(this._storageItem, props.size))
         .done(onSuccess, onError);
     }
     
@@ -14,14 +14,14 @@ class StorageFileEntry extends StorageEntry implements FileEntry {
         .done(onSuccess, onError);
     }
     
-    moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback) {
+    moveTo(parent: StorageDirectoryEntry, newName: string = this.name, onSuccess?: EntryCallback, onError: ErrorCallback) {
         this._storageItem.moveAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists).done(
             () => onSuccess(this),
             onError
         );
     }
     
-    copyTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback) {
+    copyTo(parent: StorageDirectoryEntry, newName: string = this.name, onSuccess?: EntryCallback, onError: ErrorCallback) {
         this._storageItem.copyAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists).done(
             () => onSuccess(this),
             onError
