@@ -1,6 +1,6 @@
 namespace Windows.Storage {
     export interface IStorageItem2 extends IStorageItem {
-        getParentAsync(): Windows.Foundation.IAsyncOperation<IStorageFolder>;
+        getParentAsync(): Windows.Foundation.IAsyncOperation<StorageFolder>;
     }
 }
 
@@ -18,7 +18,7 @@ class StorageEntry implements Entry {
     }
     
     get fullPath() {
-        return this._storageItem.path;
+        return this._storageItem.path.slice(this.filesystem.root._storageItem.path.length).replace(/\\/g, '/');
     }
     
     @readonly filesystem: StorageFileSystem;
@@ -43,11 +43,15 @@ class StorageEntry implements Entry {
     }
     
     toURL() {
-        let fs = this.filesystem;
-        return `ms-appdata:///${fs.name}/${this._storageItem.path.slice(fs.root.fullPath.length + 1).replace(/\\/g, '/')}`;
+        return 'ms-appdata:///' + this.filesystem.name + this.fullPath;
     }
     
     remove(onSuccess: VoidCallback, onError?: ErrorCallback) {
+        /*
+        if (this._storageItem.path === this.filesystem.root._storageItem.path) {
+            throw new NoModificationAllowedError();
+        }
+        */
         this._storageItem.deleteAsync().done(onSuccess, onError);
     }
     
