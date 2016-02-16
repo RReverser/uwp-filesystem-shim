@@ -20,7 +20,7 @@ var requestFileSystem =
     };
 
 var resolveLocalFileSystemURL =
-    window.resolveLocalFileSystemURL = 
+    window.resolveLocalFileSystemURL =
     function resolveLocalFileSystemURL(url, onSuccess, onError?) {
         let match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
         if (!match) {

@@ -19,7 +19,7 @@ interface ProgressEventHandlerMap {
 class ProgressEventTarget implements EventTarget {
     private static _eventTypes: string[];
     private _listeners: { [type: string]: Set<ProgressEventHandler> } = Object.create(null);
-    
+
     constructor() {
         (<typeof ProgressEventTarget>this.constructor)._eventTypes.forEach(type => {
             this._listeners[type] = new Set();
@@ -32,16 +32,16 @@ class ProgressEventTarget implements EventTarget {
             this._listeners[type].add(listener);
         }
     }
-    
+
     dispatchEvent(event: ProgressEvent) {
         this._listeners[event.type].forEach(listener => listener.call(this, event));
         return !event.defaultPrevented;
     }
-    
+
     removeEventListener(type: string, listener: ProgressEventHandler) {
         this._listeners[type].delete(listener);
     }
-    
+
     static _defineEventAttr(key: string) {
         const type = key.slice(2);
         const privateKey = `_${key}`;

@@ -8,7 +8,7 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     @readonly static INIT = ReadyState.INIT;
     @readonly static WRITING = ReadyState.WRITING;
     @readonly static DONE = ReadyState.DONE;
-    
+
     @readonly INIT = ReadyState.INIT;
     @readonly WRITING = ReadyState.WRITING;
     @readonly DONE = ReadyState.DONE;
@@ -17,7 +17,7 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     private _error: DOMError = null;
     private _writingProcess: Windows.Foundation.IPromise<any> = null;
     private _position: number = 0;
-    
+
     @progressEvent onwritestart: ProgressEventHandler;
     @progressEvent onprogress: ProgressEventHandler;
     @progressEvent onwrite: ProgressEventHandler;
@@ -28,7 +28,7 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     get readyState() {
         return this._readyState;
     }
-    
+
     get error() {
         return this._error;
     }
@@ -87,7 +87,7 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
         this.dispatchEvent(new ProgressEvent(status));
         this.dispatchEvent(new ProgressEvent('writeend'));
     }
-    
+
     private _writeProgress(loaded: number, total: number) {
         this.dispatchEvent(new ProgressEvent('progress', {
             lengthComputable: true,

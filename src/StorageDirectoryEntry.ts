@@ -3,18 +3,18 @@ function ensureEmpty(folder: Windows.Storage.StorageFolder) {
         if (length > 0) {
             throw new NoModificationAllowedError();
         }
-    });    
+    });
 }
 
 class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
     _storageItem: Windows.Storage.StorageFolder;
     isFile = false;
     isDirectory = true;
-    
+
     createReader() {
         return new StorageDirectoryReader(this.filesystem, this._storageItem);
     }
-    
+
     private _getItem<T extends Windows.Storage.IStorageItem>(
         createItemAsync: (desiredName: string, options: Windows.Storage.CreationCollisionOption) => Windows.Foundation.IAsyncOperation<T>,
         getItemAsync: (name: string) => Windows.Foundation.IAsyncOperation<T>,
@@ -38,7 +38,7 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
             onError
         );
     }
-    
+
     getFile(path: string, options?: Flags, onSuccess?: FileEntryCallback, onError?: ErrorCallback) {
         this._getItem(
             this._storageItem.createFileAsync,
@@ -49,7 +49,7 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
             onError
         );
     }
-    
+
     getDirectory(path: string, options?: Flags, onSuccess?: DirectoryEntryCallback, onError?: ErrorCallback) {
         this._getItem(
             this._storageItem.createFolderAsync,
@@ -60,15 +60,15 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
             onError
         );
     }
-    
+
     remove(onSuccess: VoidCallback, onError: ErrorCallback = noop) {
         ensureEmpty(this._storageItem).done(() => super.remove(onSuccess, onError), onError);
     }
-    
+
     removeRecursively(onSuccess: VoidCallback, onError: ErrorCallback = noop) {
         super.remove(onSuccess, onError);
     }
-    
+
     private _sync(
         onFile: (file: Windows.Storage.StorageFile, dest: Windows.Storage.StorageFolder) => Windows.Foundation.IPromise<any>,
         onFolder: (folder: Windows.Storage.StorageFolder, dest: Windows.Storage.StorageFolder) => Windows.Foundation.IPromise<any>,
@@ -89,19 +89,19 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
             folders: folders.map(folder => onFolder(folder, dest))
         }));
     }
-    
+
     moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError: ErrorCallback = noop) {
         this._moveTo(this._storageItem, parent._storageItem, newName)
         .then(() => this)
         .done(onSuccess, onError);
     }
-    
+
     copyTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError: ErrorCallback = noop) {
         this._copyTo(this._storageItem, parent._storageItem, newName)
         .then(() => this)
         .done(onSuccess, onError);
     }
-    
+
     _moveTo(folder: Windows.Storage.StorageFolder, parent: Windows.Storage.StorageFolder, newName?: string): WinJS.IPromise<void> {
         return this._sync(
             (file, dest) => file.moveAsync(dest, file.name, Windows.Storage.NameCollisionOption.replaceExisting).then(() => {}),
@@ -110,8 +110,8 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
             parent,
             newName
         );
-    }  
-    
+    }
+
     _copyTo(folder: Windows.Storage.StorageFolder, parent: Windows.Storage.StorageFolder, newName?: string): WinJS.IPromise<void> {
         return this._sync(
             (file, dest) => file.copyAsync(dest, file.name, Windows.Storage.NameCollisionOption.replaceExisting),
@@ -120,5 +120,5 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
             parent,
             newName
         );
-    }    
+    }
 }
