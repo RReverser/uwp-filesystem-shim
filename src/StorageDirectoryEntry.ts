@@ -1,13 +1,21 @@
-function ensureEmpty(folder: Windows.Storage.StorageFolder) {
-    return folder.getItemsAsync(0, 1).then(({ length }) => {
-        if (length > 0) {
-            throw new NoModificationAllowedError();
-        }
-    });
+import { async } from './async';
+import { NoModificationAllowedError } from './errors';
+import { StorageEntry, createStorageEntry } from './StorageEntry';
+import { StorageDirectoryReader } from './StorageDirectoryReader';
+import { StorageFolder } from './winTypes';
+
+const { CreationCollisionOption, NameCollisionOption } = Windows.Storage;
+
+async function ensureEmpty(folder: StorageFolder) {
+    let { length } = await folder.getItemsAsync(0, 1);
+    if (length > 0) {
+        throw new NoModificationAllowedError();
+    }
+    return folder;
 }
 
-class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
-    _storageItem: Windows.Storage.StorageFolder;
+export class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
+    _storageItem: StorageFolder;
     isFile = false;
     isDirectory = true;
 
@@ -15,32 +23,31 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
         return new StorageDirectoryReader(this.filesystem, this._storageItem);
     }
 
-    private _getItem<T extends Windows.Storage.IStorageItem>(
-        createItemAsync: (desiredName: string, options: Windows.Storage.CreationCollisionOption) => Windows.Foundation.IAsyncOperation<T>,
-        getItemAsync: (name: string) => Windows.Foundation.IAsyncOperation<T>,
+    @async
+    private async _getItem<I extends Windows.Storage.IStorageItem>(
+        createItemAsync: (desiredName: string, options?: Windows.Storage.CreationCollisionOption) => PromiseLike<I>,
+        getItemAsync: (name: string) => PromiseLike<I>,
         path: string,
         options?: Flags,
         onSuccess?: EntryCallback,
-        onError: ErrorCallback = noop
+        onError?: ErrorCallback
     ) {
         let storageFolder = this._storageItem;
         if (path[0] === '/') {
             storageFolder = this.filesystem.root._storageItem;
             path = path.slice(1);
         }
-        let collisionOpt = Windows.Storage.CreationCollisionOption;
-        (
-            options && options.create
-            ? createItemAsync.call(storageFolder, path, options && options.exclusive ? collisionOpt.failIfExists : collisionOpt.openIfExists)
-            : getItemAsync.call(storageFolder, path)
-        ).done(
-            (storageItem: T) => onSuccess(createStorageEntry(this.filesystem, storageItem)),
-            onError
-        );
+        let storageItem: I;
+        if (options && options.create) {
+            storageItem = await createItemAsync.call(storageFolder, path, options.exclusive ? CreationCollisionOption.failIfExists : CreationCollisionOption.openIfExists);
+        } else {
+            storageItem = await getItemAsync.call(storageFolder, path);
+        }
+        return createStorageEntry(this.filesystem, storageItem);
     }
 
     getFile(path: string, options?: Flags, onSuccess?: FileEntryCallback, onError?: ErrorCallback) {
-        this._getItem(
+        return this._getItem(
             this._storageItem.createFileAsync,
             this._storageItem.getFileAsync,
             path,
@@ -51,7 +58,7 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
     }
 
     getDirectory(path: string, options?: Flags, onSuccess?: DirectoryEntryCallback, onError?: ErrorCallback) {
-        this._getItem(
+        return this._getItem(
             this._storageItem.createFolderAsync,
             this._storageItem.getFolderAsync,
             path,
@@ -61,36 +68,37 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
         );
     }
 
-    remove(onSuccess: VoidCallback, onError: ErrorCallback = noop) {
-        ensureEmpty(this._storageItem).done(() => super.remove(onSuccess, onError), onError);
+    protected async _remove() {
+        await ensureEmpty(this._storageItem);
+        await super._remove();
     }
 
-    removeRecursively(onSuccess: VoidCallback, onError: ErrorCallback = noop) {
-        super.remove(onSuccess, onError);
+    removeRecursively(onSuccess: VoidCallback, onError?: ErrorCallback) {
+        super._remove().then(onSuccess, onError);
     }
 
-    private _sync(
-        onFile: (file: Windows.Storage.StorageFile, dest: Windows.Storage.StorageFolder) => Windows.Foundation.IPromise<any>,
-        onFolder: (folder: Windows.Storage.StorageFolder, dest: Windows.Storage.StorageFolder) => Windows.Foundation.IPromise<any>,
-        folder: Windows.Storage.StorageFolder,
-        parent: Windows.Storage.StorageFolder,
+    private async _sync(
+        onFile: (file: StorageFile, dest: StorageFolder) => Windows.Foundation.IPromise<any>,
+        onFolder: (folder: StorageFolder, dest: StorageFolder) => Windows.Foundation.IPromise<any>,
+        folder: StorageFolder,
+        parent: StorageFolder,
         name: string = folder.name
     ) {
-        return WinJS.Promise.join({
-            dest: parent.createFolderAsync(name, Windows.Storage.CreationCollisionOption.openIfExists).then(ensureEmpty),
-            files: folder.getFilesAsync(),
-            folders: folder.getFoldersAsync()
-        }).then(({ dest, files, folders }: {
-            dest: Windows.Storage.StorageFolder,
-            files: Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFile>,
-            folders: Windows.Foundation.Collections.IVectorView<Windows.Storage.StorageFolder>
-        }) => WinJS.Promise.join({
-            files: files.map(file => onFile(file, dest)),
-            folders: folders.map(folder => onFolder(folder, dest))
-        }));
+        let dest: StorageFolder;
+        let files: Windows.Foundation.Collections.IVectorView<StorageFile>;
+        let folders: Windows.Foundation.Collections.IVectorView<StorageFolder>;
+        [ dest, files, folders ] = await Promise.all([
+            Promise.resolve(parent.createFolderAsync(name, CreationCollisionOption.openIfExists)).then(ensureEmpty),
+            folder.getFilesAsync(),
+            folder.getFoldersAsync()
+        ]);
+        await Promise.all([
+            files.map(file => onFile(file, dest)),
+            folders.map(folder => onFolder(folder, dest))
+        ]);
     }
 
-    moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError: ErrorCallback = noop) {
+    moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback) {
         this._moveTo(this._storageItem, parent._storageItem, newName)
         .then(() => this)
         .done(onSuccess, onError);
@@ -102,9 +110,9 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
         .done(onSuccess, onError);
     }
 
-    _moveTo(folder: Windows.Storage.StorageFolder, parent: Windows.Storage.StorageFolder, newName?: string): WinJS.IPromise<void> {
+    _moveTo(folder: StorageFolder, parent: StorageFolder, newName?: string): WinJS.IPromise<void> {
         return this._sync(
-            (file, dest) => file.moveAsync(dest, file.name, Windows.Storage.NameCollisionOption.replaceExisting).then(() => {}),
+            (file, dest) => file.moveAsync(dest, file.name, NameCollisionOption.replaceExisting).then(() => {}),
             (folder, dest) => this._moveTo(folder, dest),
             folder,
             parent,
@@ -112,9 +120,9 @@ class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
         );
     }
 
-    _copyTo(folder: Windows.Storage.StorageFolder, parent: Windows.Storage.StorageFolder, newName?: string): WinJS.IPromise<void> {
+    _copyTo(folder: StorageFolder, parent: StorageFolder, newName?: string): WinJS.IPromise<void> {
         return this._sync(
-            (file, dest) => file.copyAsync(dest, file.name, Windows.Storage.NameCollisionOption.replaceExisting),
+            (file, dest) => file.copyAsync(dest, file.name, NameCollisionOption.replaceExisting),
             (folder, dest) => this._copyTo(folder, dest),
             folder,
             parent,

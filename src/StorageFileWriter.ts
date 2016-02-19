@@ -1,10 +1,14 @@
+import { ProgressEventTarget, ProgressEventHandler, progressEvent } from './ProgressEvent';
+import { AbortError, InvalidStateError } from './errors';
+import { readonly } from './readonly';
+
 const enum ReadyState {
     INIT,
     WRITING,
     DONE
 };
 
-class StorageFileWriter extends ProgressEventTarget implements FileWriter {
+export class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     @readonly static INIT = ReadyState.INIT;
     @readonly static WRITING = ReadyState.WRITING;
     @readonly static DONE = ReadyState.DONE;
@@ -96,39 +100,37 @@ class StorageFileWriter extends ProgressEventTarget implements FileWriter {
         }));
     }
 
-    private _write(write: (stream: Windows.Storage.Streams.IRandomAccessStream) => void) {
+    private async _write(write: (stream: Windows.Storage.Streams.IRandomAccessStream) => void | PromiseLike<void>) {
         this._writeStart();
-        this._writingProcess = this._writeStart().then(stream => {
-            let position = this._position;
-            let length = this._length = stream.size;
-            if (position > length) {
-                position = this._position = length;
-            }
-            stream.seek(position);
-            return (
-                WinJS.Promise.wrap(stream)
-                .then(write)
-                .then(() => stream.flushAsync())
-                .then(() => {}, err => err)
-                .then(err => {
+        let status: string;
+        try {
+            await (this._writingProcess = this._writeStart().then(async (stream) => {
+                let position = this._position;
+                let length = this._length = stream.size;
+                if (position > length) {
+                    position = this._position = length;
+                }
+                stream.seek(position);
+                try {
+                    await write(stream);
+                    await stream.flushAsync();
+                } finally {
                     this._length = stream.size;
                     this._position = Math.min(stream.position, this._length);
                     stream.close();
-                    return err && WinJS.Promise.wrapError(err);
-                })
-            );
-        });
-        this._writingProcess.done(
-            () => this._writeEnd('write'),
-            err => {
-                // TODO: check whether this is required
-                if (this._error instanceof AbortError) {
-                    return;
                 }
+            }));
+            status = 'write';
+        } catch (err) {
+            if (!(this._error instanceof AbortError)) {
+                status = 'error';
                 this._error = err;
-                this._writeEnd('error');
             }
-        );
+        } finally {
+            if (status) {
+                this._writeEnd(status);
+            }
+        }
     }
 
     truncate(newLength: number) {

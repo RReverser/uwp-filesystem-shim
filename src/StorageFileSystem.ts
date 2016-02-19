@@ -1,4 +1,7 @@
-class StorageFileSystem implements FileSystem {
+import { StorageDirectoryEntry } from './StorageDirectoryEntry';
+import { readonly } from './readonly';
+
+export class StorageFileSystem implements FileSystem {
     @readonly name: string;
     @readonly root: StorageDirectoryEntry;
 

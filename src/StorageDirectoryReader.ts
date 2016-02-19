@@ -1,4 +1,7 @@
-class StorageDirectoryReader implements DirectoryReader {
+import { StorageFileSystem } from './StorageFileSystem';
+import { createStorageEntry } from './StorageEntry';
+
+export class StorageDirectoryReader implements DirectoryReader {
     private _read = false;
 
     constructor(private _filesystem: StorageFileSystem, private _storageFolder: Windows.Storage.StorageFolder) {}

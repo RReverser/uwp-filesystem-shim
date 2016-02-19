@@ -5,17 +5,14 @@
   "path": "typings",
   "bundle": "typings/tsd.d.ts",
   "installed": {
-    "winrt/winrt.d.ts": {
-      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
-    },
-    "winjs/winjs.d.ts": {
-      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
+    "winrt/winrt-uwp.d.ts": {
+      "commit": "85af69c91599a6c904618545f0613970e1ff3f64"
     },
     "filewriter/filewriter.d.ts": {
-      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
+      "commit": "85af69c91599a6c904618545f0613970e1ff3f64"
     },
     "filesystem/filesystem.d.ts": {
-      "commit": "627b6c158b73494c803f36fc2fe00ad75faa8fde"
+      "commit": "85af69c91599a6c904618545f0613970e1ff3f64"
     }
   }
 }

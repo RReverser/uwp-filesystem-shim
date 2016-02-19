@@ -1,28 +1,16 @@
 {
     "compilerOptions": {
-        "target": "es5",
+        "target": "es6",
         "noImplicitAny": true,
         "experimentalDecorators": true,
         "suppressImplicitAnyIndexErrors": true,
+        "module": "es6",
+        "moduleResolution": "node",
         "newLine": "CRLF",
-        "outFile": "index.js"
+        "outDir": "dist"
     },
     "files": [
         "typings/tsd.d.ts",
-
-        "src/ProgressEvent.ts",
-        "src/errors.ts",
-        "src/readonly.ts",
-
-        "src/StorageEntry.ts",
-
-        "src/StorageDirectoryEntry.ts",
-        "src/StorageDirectoryReader.ts",
-
-        "src/StorageFileEntry.ts",
-        "src/StorageFileSystem.ts",
-        "src/StorageFileWriter.ts",
-
         "src/index.ts"
     ]
 }

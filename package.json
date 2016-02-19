@@ -30,6 +30,7 @@
   "homepage": "https://github.com/rreverser/uwp-filesystem#readme",
   "devDependencies": {
     "tsd": "^0.6.5",
-    "typescript": "^1.7.5"
-  }
+    "typescript": "^1.9.0-dev.20160218"
+  },
+  "dependencies": {}
 }

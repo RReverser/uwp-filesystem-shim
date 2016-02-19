@@ -10,15 +10,15 @@ try {
     ProgressEvent.prototype = proto;
 }
 
-type ProgressEventHandler = (event: ProgressEvent) => void;
+export type ProgressEventHandler = (event: ProgressEvent) => void;
 
 interface ProgressEventHandlerMap {
     [name: string]: ProgressEventHandler;
 }
 
-class ProgressEventTarget implements EventTarget {
+export class ProgressEventTarget implements EventTarget {
     private static _eventTypes: string[];
-    private _listeners: { [type: string]: Set<ProgressEventHandler> } = Object.create(null);
+    private _listeners = new Map<string, Set<ProgressEventHandler>>();
 
     constructor() {
         (<typeof ProgressEventTarget>this.constructor)._eventTypes.forEach(type => {
@@ -34,7 +34,7 @@ class ProgressEventTarget implements EventTarget {
     }
 
     dispatchEvent(event: ProgressEvent) {
-        this._listeners[event.type].forEach(listener => listener.call(this, event));
+        this._listeners.get(event.type).forEach(listener => listener.call(this, event));
         return !event.defaultPrevented;
     }
 
@@ -76,6 +76,6 @@ class ProgressEventTarget implements EventTarget {
     }
 }
 
-function progressEvent(target: ProgressEventTarget, key: string) {
+export function progressEvent(target: ProgressEventTarget, key: string) {
     (<typeof ProgressEventTarget>target.constructor)._defineEventAttr(key);
 }

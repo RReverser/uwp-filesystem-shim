@@ -1,15 +1,17 @@
-namespace Windows.Storage {
-    export interface IStorageItem2 extends IStorageItem {
-        getParentAsync(): Windows.Foundation.IAsyncOperation<StorageFolder>;
-    }
-}
+import { NoModificationAllowedError } from './errors';
+import { StorageFileSystem } from './StorageFileSystem';
+import { StorageFileEntry } from './StorageFileEntry';
+import { StorageDirectoryEntry } from './StorageDirectoryEntry';
+import { StorageFile, StorageFolder, IStorageItem } from './winTypes';
+import { readonly } from './readonly';
+import './winTypes';
 
-function createStorageEntry(filesystem: StorageFileSystem, storageItem: Windows.Storage.IStorageItem): StorageEntry {
+export function createStorageEntry(filesystem: StorageFileSystem, storageItem: IStorageItem): StorageEntry {
     let CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
     return new CustomStorageEntry(filesystem, storageItem);
 }
 
-class StorageEntry implements Entry {
+export abstract class StorageEntry implements Entry {
     @readonly isFile: boolean;
     @readonly isDirectory: boolean;
 
@@ -23,7 +25,7 @@ class StorageEntry implements Entry {
 
     @readonly filesystem: StorageFileSystem;
 
-    constructor(filesystem: StorageFileSystem, public _storageItem: Windows.Storage.IStorageItem) {
+    constructor(filesystem: StorageFileSystem, public _storageItem: IStorageItem) {
         this.filesystem = filesystem;
     }
 
@@ -34,29 +36,27 @@ class StorageEntry implements Entry {
         );
     }
 
-    moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback) {
-        throw new NotImplementedError();
-    }
+    abstract moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback): void;
 
-    copyTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback) {
-        throw new NotImplementedError();
-    }
+    abstract copyTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback): void;
 
     toURL() {
         return 'ms-appdata:///' + this.filesystem.name + this.fullPath;
     }
 
-    remove(onSuccess: VoidCallback, onError?: ErrorCallback) {
-        /*
+    protected async _remove() {
         if (this._storageItem.path === this.filesystem.root._storageItem.path) {
             throw new NoModificationAllowedError();
         }
-        */
-        this._storageItem.deleteAsync().done(onSuccess, onError);
+        await this._storageItem.deleteAsync();
+    }
+
+    remove(onSuccess: VoidCallback, onError?: ErrorCallback) {
+        this._remove().then(onSuccess, onError);
     }
 
     getParent(onSuccess: DirectoryEntryCallback, onError?: ErrorCallback) {
-        (<Windows.Storage.IStorageItem2>this._storageItem).getParentAsync().done(
+        this._storageItem.getParentAsync().done(
             parent => onSuccess(parent ? new StorageDirectoryEntry(this.filesystem, parent) : this.filesystem.root),
             onError
         );

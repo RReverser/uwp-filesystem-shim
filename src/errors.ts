@@ -1,10 +1,4 @@
-class AbortError extends Error {}
-class InvalidStateError extends Error {}
-class NoModificationAllowedError extends Error {}
-class SecurityError extends Error {}
-
-class NotImplementedError extends Error {
-    constructor() {
-        super('Not implemented.');
-    }
-}
+export class AbortError extends Error {}
+export class InvalidStateError extends Error {}
+export class NoModificationAllowedError extends Error {}
+export class SecurityError extends Error {}

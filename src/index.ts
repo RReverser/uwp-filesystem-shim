@@ -1,7 +1,15 @@
-const TEMPORARY = 0;
-const PERSISTENT = 1;
+import { SecurityError } from './errors';
+import { StorageFileSystem } from './StorageFileSystem';
+import { StorageFileEntry } from './StorageFileEntry';
+import { wrapAsync } from './async';
 
-const appData = Windows.Storage.ApplicationData.current;
+const { Uri } = Windows.Foundation;
+const { StorageFile, ApplicationData: { current: appData } } = Windows.Storage;
+
+export enum FileSystemType {
+    TEMPORARY,
+    PERSISTENT
+}
 
 const fileSystemResolvers = [
     () => new StorageFileSystem('temp', appData.temporaryFolder),
@@ -12,22 +20,16 @@ const fileSystemResolvers = [
     return fs;
 });
 
-var requestFileSystem =
-    window.requestFileSystem =
-    window.webkitRequestFileSystem =
-    function requestFileSystem(type, size, onSuccess, onError?) {
-        onSuccess(fileSystemResolvers[type]());
-    };
+export const requestFileSystem: typeof window.requestFileSystem = wrapAsync((type: FileSystemType, size: number) => {
+    return fileSystemResolvers[type]();
+});
 
-var resolveLocalFileSystemURL =
-    window.resolveLocalFileSystemURL =
-    function resolveLocalFileSystemURL(url, onSuccess, onError?) {
-        let match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
-        if (!match) {
-            onError && onError(new SecurityError());
-            return;
-        }
-        let type = match[1] === 'local' ? PERSISTENT : TEMPORARY;
-        Windows.Storage.StorageFile.getFileFromApplicationUriAsync(new Windows.Foundation.Uri(url))
-        .done(file => new StorageFileEntry(fileSystemResolvers[type](), file), onError);
-    };
+export const resolveLocalFileSystemURL: typeof window.resolveLocalFileSystemURL = wrapAsync(async (url: string) => {
+    let match = url.match(/^ms-appdata:\/{3}(local|temp)\//);
+    if (!match) {
+        throw new SecurityError();
+    }
+    let type = match[1] === 'local' ? FileSystemType.PERSISTENT : FileSystemType.TEMPORARY;
+    let file = await StorageFile.getFileFromApplicationUriAsync(new Uri(url));
+    return new StorageFileEntry(fileSystemResolvers[type](), file);
+});
