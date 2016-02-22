@@ -6,7 +6,7 @@ try {
         let event = document.createEvent('ProgressEvent');
         event.initProgressEvent(type, eventInitDict.bubbles, eventInitDict.cancelable, eventInitDict.lengthComputable, eventInitDict.loaded, eventInitDict.total);
         return event;
-    };
+    } as any;
     ProgressEvent.prototype = proto;
 }
 
@@ -41,41 +41,38 @@ export class ProgressEventTarget implements EventTarget {
     removeEventListener(type: string, listener: ProgressEventHandler) {
         this._listeners[type].delete(listener);
     }
-
-    static _defineEventAttr(key: string) {
-        const type = key.slice(2);
-        const privateKey = `_${key}`;
-        (this._eventTypes || (this._eventTypes = [])).push(type);
-        Object.defineProperty(this.prototype, key, {
-            configurable: true,
-            enumerable: true,
-            get(): ProgressEventHandler {
-                return this[privateKey];
-            },
-            set(handler: ProgressEventHandler) {
-                // .onstuff = ... firstly removes the old handler if present
-                let normalizedHandler = (<ProgressEventHandlerMap>this)[privateKey];
-                if (normalizedHandler !== null) {
-                    (<ProgressEventTarget>this).removeEventListener(type, normalizedHandler);
-                }
-                if (typeof handler === 'function') {
-                    // then adds the new handler if it's callable
-                    normalizedHandler = target => {
-                        if (handler.call(target, event) === false) {
-                            event.preventDefault();
-                        }
-                    };
-                    (<ProgressEventTarget>this).addEventListener(type, normalizedHandler);
-                } else {
-                    // or simply sets .onstuff value to null if non-callable
-                    normalizedHandler = null;
-                }
-                (<ProgressEventHandlerMap>this)[privateKey] = normalizedHandler;
-            }
-        });
-    }
 }
 
 export function progressEvent(target: ProgressEventTarget, key: string) {
-    (<typeof ProgressEventTarget>target.constructor)._defineEventAttr(key);
+    const Ctor = target.constructor as typeof ProgressEventTarget;
+    const type = key.slice(2);
+    const privateKey = `_${key}`;
+    (this._eventTypes || (this._eventTypes = [])).push(type);
+    Object.defineProperty(target, key, {
+        configurable: true,
+        enumerable: true,
+        get(): ProgressEventHandler {
+            return this[privateKey];
+        },
+        set(handler: ProgressEventHandler) {
+            // .onstuff = ... firstly removes the old handler if present
+            let normalizedHandler = (<ProgressEventHandlerMap>this)[privateKey];
+            if (normalizedHandler !== null) {
+                (<ProgressEventTarget>this).removeEventListener(type, normalizedHandler);
+            }
+            if (typeof handler === 'function') {
+                // then adds the new handler if it's callable
+                normalizedHandler = target => {
+                    if (handler.call(target, event) === false) {
+                        event.preventDefault();
+                    }
+                };
+                (<ProgressEventTarget>this).addEventListener(type, normalizedHandler);
+            } else {
+                // or simply sets .onstuff value to null if non-callable
+                normalizedHandler = null;
+            }
+            (<ProgressEventHandlerMap>this)[privateKey] = normalizedHandler;
+        }
+    });
 }

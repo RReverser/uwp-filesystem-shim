@@ -6,7 +6,7 @@ import { wrapAsync } from './async';
 const { Uri } = Windows.Foundation;
 const { StorageFile, ApplicationData: { current: appData } } = Windows.Storage;
 
-export enum FileSystemType {
+export const enum FileSystemType {
     TEMPORARY,
     PERSISTENT
 }

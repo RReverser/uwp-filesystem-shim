@@ -2,9 +2,10 @@ import { async } from './async';
 import { NoModificationAllowedError } from './errors';
 import { StorageEntry, createStorageEntry } from './StorageEntry';
 import { StorageDirectoryReader } from './StorageDirectoryReader';
-import { StorageFolder } from './winTypes';
+import { StorageFolder, StorageFile, IStorageItem } from './winTypes';
 
 const { CreationCollisionOption, NameCollisionOption } = Windows.Storage;
+type IVectorView<T> = Windows.Foundation.Collections.IVectorView<T>;
 
 async function ensureEmpty(folder: StorageFolder) {
     let { length } = await folder.getItemsAsync(0, 1);
@@ -14,8 +15,27 @@ async function ensureEmpty(folder: StorageFolder) {
     return folder;
 }
 
-export class StorageDirectoryEntry extends StorageEntry implements DirectoryEntry {
-    _storageItem: StorageFolder;
+async function sync(
+    onFile: (dest: Windows.Storage.IStorageFolder, newName: string, option: Windows.Storage.NameCollisionOption) => PromiseLike<any>,
+    folder: StorageFolder,
+    parent: StorageFolder,
+    newName: string = folder.name
+) {
+    let dest: StorageFolder;
+    let files: IVectorView<StorageFile>;
+    let folders: IVectorView<StorageFolder>;
+    [ dest, files, folders ] = await Promise.all([
+        Promise.resolve(parent.createFolderAsync(newName, CreationCollisionOption.openIfExists)).then(ensureEmpty),
+        folder.getFilesAsync(),
+        folder.getFoldersAsync()
+    ]);
+    await Promise.all([
+        files.map(file => onFile.call(file, dest, file.name, NameCollisionOption.replaceExisting)),
+        folders.map(folder => sync(onFile, folder, dest))
+    ]);
+}
+
+export class StorageDirectoryEntry extends StorageEntry<StorageFolder> implements DirectoryEntry {
     isFile = false;
     isDirectory = true;
 
@@ -24,14 +44,14 @@ export class StorageDirectoryEntry extends StorageEntry implements DirectoryEntr
     }
 
     @async
-    private async _getItem<I extends Windows.Storage.IStorageItem>(
+    private async _getItem<I extends IStorageItem>(
         createItemAsync: (desiredName: string, options?: Windows.Storage.CreationCollisionOption) => PromiseLike<I>,
         getItemAsync: (name: string) => PromiseLike<I>,
         path: string,
         options?: Flags,
         onSuccess?: EntryCallback,
         onError?: ErrorCallback
-    ) {
+    ): Promise<Entry> {
         let storageFolder = this._storageItem;
         if (path[0] === '/') {
             storageFolder = this.filesystem.root._storageItem;
@@ -73,58 +93,25 @@ export class StorageDirectoryEntry extends StorageEntry implements DirectoryEntr
         await super._remove();
     }
 
-    removeRecursively(onSuccess: VoidCallback, onError?: ErrorCallback) {
-        super._remove().then(onSuccess, onError);
+    @async
+    removeRecursively(): Promise<void> {
+        return super._remove();
     }
 
-    private async _sync(
-        onFile: (file: StorageFile, dest: StorageFolder) => Windows.Foundation.IPromise<any>,
-        onFolder: (folder: StorageFolder, dest: StorageFolder) => Windows.Foundation.IPromise<any>,
-        folder: StorageFolder,
-        parent: StorageFolder,
-        name: string = folder.name
-    ) {
-        let dest: StorageFolder;
-        let files: Windows.Foundation.Collections.IVectorView<StorageFile>;
-        let folders: Windows.Foundation.Collections.IVectorView<StorageFolder>;
-        [ dest, files, folders ] = await Promise.all([
-            Promise.resolve(parent.createFolderAsync(name, CreationCollisionOption.openIfExists)).then(ensureEmpty),
-            folder.getFilesAsync(),
-            folder.getFoldersAsync()
-        ]);
-        await Promise.all([
-            files.map(file => onFile(file, dest)),
-            folders.map(folder => onFolder(folder, dest))
-        ]);
-    }
-
-    moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback) {
-        this._moveTo(this._storageItem, parent._storageItem, newName)
-        .then(() => this)
-        .done(onSuccess, onError);
-    }
-
-    copyTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError: ErrorCallback = noop) {
-        this._copyTo(this._storageItem, parent._storageItem, newName)
-        .then(() => this)
-        .done(onSuccess, onError);
-    }
-
-    _moveTo(folder: StorageFolder, parent: StorageFolder, newName?: string): WinJS.IPromise<void> {
-        return this._sync(
-            (file, dest) => file.moveAsync(dest, file.name, NameCollisionOption.replaceExisting).then(() => {}),
-            (folder, dest) => this._moveTo(folder, dest),
-            folder,
+    protected async _moveTo(parent: StorageFolder, newName?: string) {
+        await sync(
+            StorageFile.prototype.moveAsync,
+            this._storageItem,
             parent,
             newName
         );
+        await this.removeRecursively();
     }
 
-    _copyTo(folder: StorageFolder, parent: StorageFolder, newName?: string): WinJS.IPromise<void> {
-        return this._sync(
-            (file, dest) => file.copyAsync(dest, file.name, NameCollisionOption.replaceExisting),
-            (folder, dest) => this._copyTo(folder, dest),
-            folder,
+    protected _copyTo(parent: StorageFolder, newName?: string) {
+        return sync(
+            StorageFile.prototype.copyAsync,
+            this._storageItem,
             parent,
             newName
         );

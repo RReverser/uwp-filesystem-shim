@@ -1,6 +1,8 @@
 import { ProgressEventTarget, ProgressEventHandler, progressEvent } from './ProgressEvent';
 import { AbortError, InvalidStateError } from './errors';
 import { readonly } from './readonly';
+import { StorageFile } from './winTypes';
+import { Awaitable } from './async';
 
 const enum ReadyState {
     INIT,
@@ -45,7 +47,7 @@ export class StorageFileWriter extends ProgressEventTarget implements FileWriter
         return this._length;
     }
 
-    constructor(private _file: Windows.Storage.StorageFile, private _length: number) {
+    constructor(private _file: StorageFile, private _length: number) {
         super();
     }
 
@@ -100,7 +102,7 @@ export class StorageFileWriter extends ProgressEventTarget implements FileWriter
         }));
     }
 
-    private async _write(write: (stream: Windows.Storage.Streams.IRandomAccessStream) => void | PromiseLike<void>) {
+    private async _write(write: (stream: Windows.Storage.Streams.IRandomAccessStream) => Awaitable<void>) {
         this._writeStart();
         let status: string;
         try {

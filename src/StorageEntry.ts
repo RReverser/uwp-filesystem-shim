@@ -2,16 +2,28 @@ import { NoModificationAllowedError } from './errors';
 import { StorageFileSystem } from './StorageFileSystem';
 import { StorageFileEntry } from './StorageFileEntry';
 import { StorageDirectoryEntry } from './StorageDirectoryEntry';
-import { StorageFile, StorageFolder, IStorageItem } from './winTypes';
+import { StorageFolder, StorageFile, IStorageItem } from './winTypes';
 import { readonly } from './readonly';
-import './winTypes';
+import { async, Awaitable } from './async';
 
-export function createStorageEntry(filesystem: StorageFileSystem, storageItem: IStorageItem): StorageEntry {
-    let CustomStorageEntry = storageItem.isOfType(Windows.Storage.StorageItemTypes.file) ? StorageFileEntry : StorageDirectoryEntry;
-    return new CustomStorageEntry(filesystem, storageItem);
+function isFolder(storageItem: IStorageItem): storageItem is StorageFolder {
+    return storageItem.isOfType(Windows.Storage.StorageItemTypes.folder);
 }
 
-export abstract class StorageEntry implements Entry {
+function isFile(storageItem: IStorageItem): storageItem is StorageFile {
+    return storageItem.isOfType(Windows.Storage.StorageItemTypes.file);
+}
+
+export function createStorageEntry(filesystem: StorageFileSystem, storageItem: IStorageItem): StorageEntry<IStorageItem> {
+    if (isFolder(storageItem)) {
+        return new StorageDirectoryEntry(filesystem, storageItem);
+    }
+    if (isFile(storageItem)) {
+        return new StorageFileEntry(filesystem, storageItem);
+    }
+}
+
+export abstract class StorageEntry<T extends IStorageItem> implements Entry {
     @readonly isFile: boolean;
     @readonly isDirectory: boolean;
 
@@ -25,20 +37,34 @@ export abstract class StorageEntry implements Entry {
 
     @readonly filesystem: StorageFileSystem;
 
-    constructor(filesystem: StorageFileSystem, public _storageItem: IStorageItem) {
+    constructor(filesystem: StorageFileSystem, public _storageItem: T) {
         this.filesystem = filesystem;
     }
 
-    getMetadata(onSuccess: MetadataCallback, onError?: ErrorCallback) {
-        this._storageItem.getBasicPropertiesAsync().done(
-            props => onSuccess({ modificationTime: props.dateModified, size: props.size }),
-            onError
-        );
+    @async
+    async getMetadata(): Promise<Metadata> {
+        let props = await this._storageItem.getBasicPropertiesAsync();
+        return {
+            modificationTime: props.dateModified,
+            size: props.size
+        };
     }
 
-    abstract moveTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback): void;
+    protected abstract _moveTo(parent: StorageFolder, newName: string): Awaitable<any>;
 
-    abstract copyTo(parent: StorageDirectoryEntry, newName?: string, onSuccess?: EntryCallback, onError?: ErrorCallback): void;
+    protected abstract _copyTo(parent: StorageFolder, newName: string): Awaitable<any>;
+
+    @async
+    async moveTo(parent: StorageDirectoryEntry, newName: string = this._storageItem.name): Promise<IStorageItem> {
+        await this._moveTo(parent._storageItem, newName);
+        return this._storageItem;
+    }
+
+    @async
+    async copyTo(parent: StorageDirectoryEntry, newName: string = this._storageItem.name): Promise<IStorageItem> {
+        await this._copyTo(parent._storageItem, newName);
+        return this._storageItem;
+    }
 
     toURL() {
         return 'ms-appdata:///' + this.filesystem.name + this.fullPath;
@@ -51,14 +77,14 @@ export abstract class StorageEntry implements Entry {
         await this._storageItem.deleteAsync();
     }
 
-    remove(onSuccess: VoidCallback, onError?: ErrorCallback) {
-        this._remove().then(onSuccess, onError);
+    @async
+    remove(): Promise<void> {
+        return this._remove();
     }
 
-    getParent(onSuccess: DirectoryEntryCallback, onError?: ErrorCallback) {
-        this._storageItem.getParentAsync().done(
-            parent => onSuccess(parent ? new StorageDirectoryEntry(this.filesystem, parent) : this.filesystem.root),
-            onError
-        );
+    @async
+    async getParent(): Promise<DirectoryEntry> {
+        let parent = await this._storageItem.getParentAsync();
+        return parent ? new StorageDirectoryEntry(this.filesystem, parent) : this.filesystem.root;
     }
 }

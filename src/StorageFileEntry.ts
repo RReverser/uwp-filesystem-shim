@@ -1,33 +1,29 @@
 import { StorageEntry } from './StorageEntry';
 import { StorageFileWriter } from './StorageFileWriter';
 import { StorageDirectoryEntry } from './StorageDirectoryEntry';
+import { StorageFile, StorageFolder } from './winTypes';
+import { async } from './async';
 
-export class StorageFileEntry extends StorageEntry implements FileEntry {
-    _storageItem: Windows.Storage.StorageFile;
+export class StorageFileEntry extends StorageEntry<StorageFile> implements FileEntry {
     isFile = true;
     isDirectory = false;
 
-    createWriter(onSuccess: FileWriterCallback, onError?: ErrorCallback) {
-        this._storageItem.getBasicPropertiesAsync()
-        .then(props => new StorageFileWriter(this._storageItem, props.size))
-        .done(onSuccess, onError);
+    @async
+    async createWriter(): Promise<FileWriter> {
+        let props = await this._storageItem.getBasicPropertiesAsync();
+        return new StorageFileWriter(this._storageItem, props.size);
     }
 
-    file(onSuccess: FileCallback, onError?: ErrorCallback) {
-        Promise.resolve()
-        .then(() => MSApp.createFileFromStorageFile(this._storageItem))
-        .then(onSuccess, onError);
+    @async
+    file(): File {
+        return MSApp.createFileFromStorageFile(this._storageItem);
     }
 
-    moveTo(parent: StorageDirectoryEntry, newName: string = this.name, onSuccess?: EntryCallback, onError?: ErrorCallback) {
-        this._storageItem.moveAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists)
-        .then(() => this)
-        .then(onSuccess, onError);
+    protected _moveTo(parent: StorageFolder, newName: string) {
+        return this._storageItem.moveAsync(parent, newName, Windows.Storage.NameCollisionOption.failIfExists);
     }
 
-    copyTo(parent: StorageDirectoryEntry, newName: string = this.name, onSuccess?: EntryCallback, onError?: ErrorCallback) {
-        this._storageItem.copyAsync(parent._storageItem, newName, Windows.Storage.NameCollisionOption.failIfExists)
-        .then(() => this)
-        .then(onSuccess, onError);
+    protected _copyTo(parent: StorageFolder, newName: string) {
+        return this._storageItem.copyAsync(parent, newName, Windows.Storage.NameCollisionOption.failIfExists);
     }
 }
