@@ -1,5 +1,4 @@
 import { ProgressEventTarget, ProgressEventHandler, progressEvent } from './ProgressEvent';
-import { AbortError, InvalidStateError } from './errors';
 import { readonly } from './readonly';
 import { StorageFile } from './winTypes';
 import { Awaitable } from './async';
@@ -8,7 +7,7 @@ const enum ReadyState {
     INIT,
     WRITING,
     DONE
-};
+}
 
 export class StorageFileWriter extends ProgressEventTarget implements FileWriter {
     @readonly static INIT = ReadyState.INIT;
@@ -56,13 +55,13 @@ export class StorageFileWriter extends ProgressEventTarget implements FileWriter
             return;
         }
         this._writingProcess.cancel();
-        this._error = new AbortError();
+        this._error = new Error('AbortError');
         this._writeEnd('abort');
     }
 
     seek(offset: number) {
         if (this._readyState === ReadyState.WRITING) {
-            throw new InvalidStateError();
+            throw new Error('InvalidStateError');
         }
         let { length } = this;
         if (offset > length) {
@@ -79,7 +78,7 @@ export class StorageFileWriter extends ProgressEventTarget implements FileWriter
 
     private _writeStart() {
         if (this._readyState === ReadyState.WRITING) {
-            throw new InvalidStateError();
+            throw new Error('InvalidStateError');
         }
         this._readyState = ReadyState.WRITING;
         this._error = null;
@@ -124,7 +123,7 @@ export class StorageFileWriter extends ProgressEventTarget implements FileWriter
             }));
             status = 'write';
         } catch (err) {
-            if (!(this._error instanceof AbortError)) {
+            if (this._error.name !== 'AbortError') {
                 status = 'error';
                 this._error = err;
             }

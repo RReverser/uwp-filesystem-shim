@@ -2,14 +2,14 @@ type OnSuccess<R> = (result: R) => void;
 type OnError = (err: Error) => void;
 export type Awaitable<R> = R | PromiseLike<R>;
 
-export function wrapAsync<T0, R>(func: (arg0?: T0) => Awaitable<R>): (arg0?: T0, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
-export function wrapAsync<T0, T1, R>(func: (arg0?: T0, arg1?: T1) => Awaitable<R>): (arg0?: T0, arg1?: T1, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
-export function wrapAsync<T0, T1, T2, R>(func: (arg0?: T0, arg1?: T1, arg2?: T2) => Awaitable<R>): (arg0?: T0, arg1?: T1, arg2?: T2, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
-export function wrapAsync<T0, T1, T2, T3, R>(func: (arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3) => Awaitable<R>): (arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
-export function wrapAsync<T0, T1, T2, T3, T4, R>(func: (arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4) => Awaitable<R>): (arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
-export function wrapAsync<T0, T1, T2, T3, T4, T5, R>(func: (arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4, arg5?: T5) => Awaitable<R>): (arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4, arg5?: T5, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
-export function wrapAsync(func: (...args: any[]) => Awaitable<any>): (...args: any[]) => void {
-    return function (...args: any[]) {
+export function wrapAsync<C, T0, R>(func: (this: C, arg0?: T0) => Awaitable<R>): (this: C, arg0?: T0, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
+export function wrapAsync<C, T0, T1, R>(func: (this: C, arg0?: T0, arg1?: T1) => Awaitable<R>): (this: C, arg0?: T0, arg1?: T1, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
+export function wrapAsync<C, T0, T1, T2, R>(func: (this: C, arg0?: T0, arg1?: T1, arg2?: T2) => Awaitable<R>): (this: C, arg0?: T0, arg1?: T1, arg2?: T2, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
+export function wrapAsync<C, T0, T1, T2, T3, R>(func: (this: C, arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3) => Awaitable<R>): (this: C, arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
+export function wrapAsync<C, T0, T1, T2, T3, T4, R>(func: (this: C, arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4) => Awaitable<R>): (this: C, arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
+export function wrapAsync<C, T0, T1, T2, T3, T4, T5, R>(func: (this: C, arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4, arg5?: T5) => Awaitable<R>): (this: C, arg0?: T0, arg1?: T1, arg2?: T2, arg3?: T3, arg4?: T4, arg5?: T5, onSuccess?: OnSuccess<R>, onError?: OnError) => void;
+export function wrapAsync<C>(func: (this: C, ...args: any[]) => Awaitable<any>): (this: C, ...args: any[]) => void {
+    return function (this: C, ...args: any[]) {
         let i = args.length - 1;
         for (; i >= 0 && args[i] === undefined; i--) ;
         let callbacks: Function[] = [];

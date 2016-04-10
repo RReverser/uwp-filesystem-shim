@@ -1,5 +1,4 @@
 import { async } from './async';
-import { NoModificationAllowedError } from './errors';
 import { StorageEntry, createStorageEntry } from './StorageEntry';
 import { StorageDirectoryReader } from './StorageDirectoryReader';
 import { StorageFolder, StorageFile, IStorageItem } from './winTypes';
@@ -10,7 +9,7 @@ type IVectorView<T> = Windows.Foundation.Collections.IVectorView<T>;
 async function ensureEmpty(folder: StorageFolder) {
     let { length } = await folder.getItemsAsync(0, 1);
     if (length > 0) {
-        throw new NoModificationAllowedError();
+        throw new Error('NoModificationAllowedError');
     }
     return folder;
 }

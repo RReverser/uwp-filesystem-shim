@@ -12,6 +12,6 @@ export class StorageDirectoryReader implements DirectoryReader {
     async readEntries(): Promise<Entry[]> {
         this._read = true;
         let items = await this._storageFolder.getItemsAsync();
-        return items.map(item => createStorageEntry(this._filesystem, item as IStorageItem));
+        return items.map(item => createStorageEntry(this._filesystem, item));
     }
 }

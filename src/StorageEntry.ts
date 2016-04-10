@@ -1,4 +1,3 @@
-import { NoModificationAllowedError } from './errors';
 import { StorageFileSystem } from './StorageFileSystem';
 import { StorageFileEntry } from './StorageFileEntry';
 import { StorageDirectoryEntry } from './StorageDirectoryEntry';
@@ -72,7 +71,7 @@ export abstract class StorageEntry<T extends IStorageItem> implements Entry {
 
     protected async _remove() {
         if (this._storageItem.path === this.filesystem.root._storageItem.path) {
-            throw new NoModificationAllowedError();
+            throw new Error('NoModificationAllowedError');
         }
         await this._storageItem.deleteAsync();
     }

@@ -1,8 +1,8 @@
-export function readonly(target: Object, key: string) {
+export function readonly<T>(target: T, key: string) {
     Object.defineProperty(target, key, {
         configurable: true,
         enumerable: true,
-        set(value) {
+        set(this: T, value: any) {
             Object.defineProperty(this, key, {
                 configurable: false,
                 value

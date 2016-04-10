@@ -2,6 +2,7 @@
     "compilerOptions": {
         "target": "es6",
         "noImplicitAny": true,
+        "noImplicitThis": true,
         "experimentalDecorators": true,
         "suppressImplicitAnyIndexErrors": true,
         "module": "es6",
